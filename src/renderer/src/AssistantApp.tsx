@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Avatar from './Avatar'
+import { callPeer, refreshDesktopBridge } from './desktopBridge'
 import { clipboardHasImage, insertPastedImage } from './imagePaste'
 import type {
   AvatarConfig,
   AvatarState,
+  BackupSummary,
   BridgeStatus,
   CalendarEvent,
   ConnectorInfo,
@@ -395,7 +397,7 @@ export default function AssistantApp() {
     } catch (cause) { systemError(cause) }
   }
 
-  const showPairingQr = async (): Promise<void> => {
+  const pairNewQr = async (): Promise<void> => {
     setSyncBusy(true)
     try {
       if (!bridge?.enabled || !bridge.bindLan) {
@@ -403,8 +405,24 @@ export default function AssistantApp() {
         setBridge(next)
         setDevices(next.devices)
       }
-      setPairQr(await window.api.bridge.pairQr())
-      setSystemMessage('Pairing QR ready. Scan it in the Android app’s Portable Sync tab.')
+      setPairQr(await window.api.bridge.pairNew())
+      const status = await window.api.bridge.status()
+      setBridge(status)
+      setDevices(status.devices)
+      await refreshDesktopBridge()
+      setSystemMessage('New pairing QR ready. Scan it in the Android app’s Portable Sync tab.')
+    } catch (cause) { systemError(cause) } finally {
+      setSyncBusy(false)
+    }
+  }
+
+  const syncToPhone = async (): Promise<void> => {
+    setSyncBusy(true)
+    try {
+      if (!bridge?.phoneConnected) throw new Error('No phone is connected. Pair and connect a phone first.')
+      const payload = await window.api.sync.pull()
+      const summary = await callPeer('port.receive', [payload]) as BackupSummary
+      setSystemMessage(`Ported to phone: ${summary.conversations} chats, ${summary.messages} messages.`)
     } catch (cause) { systemError(cause) } finally {
       setSyncBusy(false)
     }
@@ -1162,7 +1180,7 @@ export default function AssistantApp() {
           <button type="button" className="small" onClick={() => setShowDev((value) => !value)}>Dev</button>
           <button type="button" className="small" onClick={() => setShowKnowledge((value) => !value)}>Knowledge</button>
           <button type="button" className="small" onClick={() => setShowData((value) => !value)}>Data</button>
-          <button type="button" className="small primary" onClick={() => setShowSync((value) => !value)}>Portable Sync</button>
+          <button type="button" className="small primary" onClick={() => setShowSync((value) => !value)}>Port</button>
           <button type="button" className="small" onClick={() => void exportChat()}>Export</button>
           <button type="button" className="small" onClick={() => { setShowData(true); setDataTab('calendar') }}>Calendar</button>
           <button type="button" className="small" onClick={() => { setShowData(true); setDataTab('voice') }}>Voice</button>
@@ -1281,7 +1299,7 @@ export default function AssistantApp() {
         {showSync && (
           <div className="data-drawer sync-drawer">
             <div className="data-tabs">
-              <strong>Portable Sync</strong>
+              <strong>Port to Android</strong>
               <small className="muted">local LAN bridge · opt-in only</small>
               <span className="spacer" />
               <button type="button" className="small" onClick={() => void loadSystem()}>Refresh</button>
@@ -1291,8 +1309,8 @@ export default function AssistantApp() {
               <div className="sync-grid">
                 <div className="sync-qr">
                   {pairQr
-                    ? <img src={pairQr.dataUrl} alt="Portable Sync pairing QR" />
-                    : <div className="qr-placeholder">QR not generated</div>}
+                    ? <img src={pairQr.dataUrl} alt="Port to Android pairing QR" />
+                    : <div className="qr-placeholder">Click Pair New</div>}
                   <small>Scan in the Android app: <strong>Portable Sync → Scan PC QR</strong>.</small>
                 </div>
                 <div className="sync-info">
@@ -1307,18 +1325,27 @@ export default function AssistantApp() {
                       </small>
                     </div>
                     <div className="row-actions">
+                      <button type="button" className="small primary" disabled={syncBusy} onClick={() => void pairNewQr()}>
+                        {syncBusy ? 'Preparing…' : 'Pair New'}
+                      </button>
+                      <button
+                        type="button"
+                        className="small"
+                        disabled={syncBusy || !bridge?.phoneConnected}
+                        title={bridge?.phoneConnected ? 'Send this PC snapshot to the connected phone' : 'Connect a phone first'}
+                        onClick={() => void syncToPhone()}
+                      >
+                        Sync
+                      </button>
                       <button type="button" className="small" onClick={() => void toggleBridge()}>
                         {bridge?.enabled ? 'Disable' : 'Enable'}
                       </button>
                       <button type="button" className="small" disabled={!bridge?.enabled} onClick={() => void toggleBridgeLan()}>
                         {bridge?.bindLan ? 'LAN on' : 'LAN off'}
                       </button>
-                      <button type="button" className="small primary" disabled={syncBusy} onClick={() => void showPairingQr()}>
-                        {syncBusy ? 'Preparing…' : 'Show pairing QR'}
-                      </button>
                     </div>
                   </div>
-                  <small className="muted">The QR contains only your LAN address and the local pairing token. No cloud service is involved.</small>
+                  <small className="muted">The QR contains only your LAN address and the local pairing token. Pair New rotates that token so older QR codes stop working. No cloud service is involved.</small>
                 </div>
               </div>
 

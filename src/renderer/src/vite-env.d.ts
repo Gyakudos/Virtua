@@ -67,6 +67,7 @@ declare global {
         setEnabled(enabled: boolean, bindLan?: boolean): Promise<BridgeStatus>
         setBindLan(bindLan: boolean): Promise<BridgeStatus>
         pairQr(): Promise<PairingQr>
+        pairNew(): Promise<PairingQr>
         devices(): Promise<TrustedDevice[]>
         revokeDevice(id: string): Promise<BridgeStatus>
         allowDevice(id: string): Promise<BridgeStatus>

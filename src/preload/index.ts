@@ -72,6 +72,7 @@ const api = {
     setBindLan: (bindLan: boolean): Promise<BridgeStatus> =>
       ipcRenderer.invoke('bridge:setBindLan', bindLan),
     pairQr: (): Promise<PairingQr> => ipcRenderer.invoke('bridge:pairQr'),
+    pairNew: (): Promise<PairingQr> => ipcRenderer.invoke('bridge:pairNew'),
     devices: (): Promise<TrustedDevice[]> => ipcRenderer.invoke('bridge:devices'),
     revokeDevice: (id: string): Promise<BridgeStatus> =>
       ipcRenderer.invoke('bridge:revokeDevice', id),

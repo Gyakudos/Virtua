@@ -246,7 +246,7 @@ Warmth, curiosity, humor, shyness, formality, energy, empathy, stubbornness, pla
 | **9a. Android migration foundation** ✅ | Transactional backup restore + Android bundle export (JSON + copied `.vrm` files) | Implemented |
 | **9b. Linked Android companion** ✅ | Desktop bridge over LAN/Tailscale, shared React renderer with an Android `window.api` adapter, SAF import | Implemented |
 | **9c. Standalone Android mode** ✅ | On-device storage + GGUF/`llama.cpp` inference behind the same API contract, SAF model/VRM import, Android TTS | Implemented |
-| **10. Smoke-test release** ✅ | Windows NSIS setup, Android debug APK, GitHub release `000.0015.000.2026`, manual update check, Portable Sync QR pairing + Trusted Devices | Implemented |
+| **10. Smoke-test release** ✅ | Windows NSIS setup, Android debug APK, GitHub release `000.0015.000.2026`, manual update check, PC Port panel with Pair New/Sync/Trusted Devices | Implemented |
 
 Phases 0–2 = "useful assistant". Phases 3–6 = "yours". Phase 9 is phased as linked-first, standalone-second.
 
@@ -295,4 +295,4 @@ To honor "local only," the app ships ready to run with no network needed at runt
 4. Verify with a pre-seeded `qwen2.5:7b-instruct`, fall back to `3b` if slow.
 5. Then proceed to Phase 1.
 
-**Current state:** the app is implemented through Phase 10 (build `0.010.19.11.26`, release `000.0015.000.2026`). The Windows setup and Android APK are published on GitHub as a full release, with top-level Portable Sync panels on both platforms for QR pairing and Trusted Devices. See the phase table above and `README.md` for what works today.
+**Current state:** the app is implemented through Phase 10 (build `0.010.19.11.26`, release `000.0015.000.2026`). The Windows setup and Android APK are published on GitHub as a full release. The PC has a top-level **Port** panel with Pair New, Sync, and Trusted Devices; the APK has a Portable Sync tab. See the phase table above and `README.md` for what works today.

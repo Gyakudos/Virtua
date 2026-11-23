@@ -28,11 +28,22 @@ let wss: WebSocketServer | null = null
 let desktopSocket: WebSocket | null = null
 let phoneSocket: WebSocket | null = null
 
+function freshToken(): string {
+  const raw = randomBytes(6).toString('hex').toUpperCase()
+  return raw.match(/.{1,4}/g)?.join('-') ?? raw
+}
+
 function pairingToken(): string {
   const existing = store.getSetting('bridge.token')
   if (existing) return existing
-  const raw = randomBytes(6).toString('hex').toUpperCase()
-  const token = raw.match(/.{1,4}/g)?.join('-') ?? raw
+  const token = freshToken()
+  store.setSetting('bridge.token', token)
+  return token
+}
+
+/** Rotate the local pairing token so old QR codes stop working for new connections. */
+export function rotatePairingToken(): string {
+  const token = freshToken()
   store.setSetting('bridge.token', token)
   return token
 }
@@ -150,7 +161,7 @@ export function bridgeStatus(): BridgeStatus {
 }
 
 /** Build a local-only deep link QR for the phone to scan. */
-export async function pairingQr(): Promise<PairingQr> {
+export async function pairingQr(token = pairingToken()): Promise<PairingQr> {
   const config = bridgeConfig()
   const lanUrl = config.urls.find((url) => !url.startsWith('http://127.0.0.1'))
   if (!lanUrl) throw new Error('Turn on LAN bridging before showing the pairing QR.')
@@ -160,7 +171,7 @@ export async function pairingQr(): Promise<PairingQr> {
   payload.searchParams.set('v', '1')
   payload.searchParams.set('host', parsed.hostname)
   payload.searchParams.set('port', parsed.port || String(config.port))
-  payload.searchParams.set('token', config.token)
+  payload.searchParams.set('token', token)
 
   const dataUrl = await QRCode.toDataURL(payload.toString(), {
     errorCorrectionLevel: 'M',
@@ -169,6 +180,11 @@ export async function pairingQr(): Promise<PairingQr> {
     color: { dark: '#111827', light: '#FFFFFF' }
   })
   return { dataUrl, payload: payload.toString(), url: `http://${parsed.host}` }
+}
+
+/** Rotate the token and return a fresh pairing QR for a new phone. */
+export async function pairNew(): Promise<PairingQr> {
+  return pairingQr(rotatePairingToken())
 }
 
 export function revokeDevice(id: string): BridgeStatus {

@@ -424,6 +424,13 @@ export function createLocalApi(): { api: Window['api']; controller: LocalControl
         await exportBundle()
         return summarizePayload(store.exportBundle())
 
+      case 'port.receive': {
+        const payload = args[0] as BackupPayload
+        if (!payload || typeof payload !== 'object') throw new Error('Invalid portable snapshot.')
+        store.importBundle(payload)
+        return summarizePayload(payload)
+      }
+
       default:
         console.warn('[mobile] unsupported api call:', path)
         return undefined

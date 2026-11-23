@@ -59,6 +59,13 @@ function normalizeBaseUrl(input: string): string {
   return url.toString().replace(/\/+$/, '')
 }
 
+function apiAt(path: string, api: Window['api']): unknown {
+  return path.split('.').reduce<unknown>((current, key) => {
+    if (!current || typeof current !== 'object') return undefined
+    return (current as Record<string, unknown>)[key]
+  }, api)
+}
+
 function collectHandlers(args: unknown[]): Record<string, (value: unknown) => void> {
   const handlers: Record<string, (value: unknown) => void> = {}
   for (const arg of args) {
@@ -106,7 +113,10 @@ export function readLinkConfig(): LinkConfig {
   }
 }
 
-export function createLinkedApi(autoConnect = true): { api: Window['api']; controller: LinkedController } {
+export function createLinkedApi(
+  autoConnect = true,
+  localApi: Window['api'] | null = null
+): { api: Window['api']; controller: LinkedController } {
   let config = readLinkConfig()
   let socket: WebSocket | null = null
   let openPromise: Promise<void> | null = null
@@ -131,6 +141,27 @@ export function createLinkedApi(autoConnect = true): { api: Window['api']; contr
     try {
       message = JSON.parse(event.data) as Record<string, any>
     } catch {
+      return
+    }
+    if (message.type === 'invoke') {
+      const id = String(message.id)
+      const path = String(message.path)
+      const api = localApi ?? window.api
+      const target = apiAt(path, api)
+      if (typeof target !== 'function') {
+        send({ type: 'result', id, ok: false, error: `Unknown phone method: ${path}` })
+        return
+      }
+      try {
+        const args = decodeValue(message.args ?? []) as unknown[]
+        void Promise.resolve(target.apply(api, args)).then((value) => {
+          send({ type: 'result', id, ok: true, value: encodeValue(value) })
+        }).catch((error: unknown) => {
+          send({ type: 'result', id, ok: false, error: error instanceof Error ? error.message : String(error) })
+        })
+      } catch (error) {
+        send({ type: 'result', id, ok: false, error: error instanceof Error ? error.message : String(error) })
+      }
       return
     }
     if (message.type === 'result') {

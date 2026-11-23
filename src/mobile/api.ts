@@ -37,7 +37,7 @@ export function installMobileApi(): { mode: MobileMode; controls: MobileControls
   if (!paired && (query === 'local' || query === 'linked')) persistMode(mode)
 
   const local = createLocalApi()
-  const linked = createLinkedApi(mode === 'linked')
+  const linked = createLinkedApi(mode === 'linked', local.api)
   window.api = mode === 'linked' ? linked.api : local.api
 
   const importPayload = async (payload: BackupPayload): Promise<BackupSummary> => {

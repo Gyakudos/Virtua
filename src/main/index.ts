@@ -7,7 +7,7 @@ import type {
   PendingApproval, Persona, Character, RagResult, VoiceConfig
 } from '../shared/types'
 import {
-  allowDevice, bridgeConfig, bridgeStatus, pairingQr, revokeDevice, setBridgeBindLan,
+  allowDevice, bridgeConfig, bridgeStatus, pairNew, pairingQr, revokeDevice, setBridgeBindLan,
   setBridgeEnabled, startBridge, stopBridge
 } from './bridge'
 import { chatOnce, chatStream, getHealth } from './ollama'
@@ -403,6 +403,7 @@ function registerIpc(): void {
     setBridgeEnabled(enabled, bindLan))
   ipcMain.handle('bridge:setBindLan', (_event, bindLan: boolean) => setBridgeBindLan(bindLan))
   ipcMain.handle('bridge:pairQr', () => pairingQr())
+  ipcMain.handle('bridge:pairNew', () => pairNew())
   ipcMain.handle('bridge:devices', () => bridgeStatus().devices)
   ipcMain.handle('bridge:revokeDevice', (_event, id: string) => revokeDevice(id))
   ipcMain.handle('bridge:allowDevice', (_event, id: string) => allowDevice(id))
