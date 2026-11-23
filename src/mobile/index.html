@@ -5,9 +5,42 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#0e1117" />
     <title>Virtua</title>
+    <style>
+      #boot-error {
+        display: none;
+        position: fixed;
+        inset: 12px;
+        z-index: 9999;
+        overflow: auto;
+        padding: 14px;
+        border: 1px solid #5b2630;
+        border-radius: 10px;
+        background: #1a1015;
+        color: #ffd9df;
+        font: 13px/1.5 system-ui, sans-serif;
+        white-space: pre-wrap;
+      }
+      #boot-error strong { color: #ff8fa3; }
+    </style>
   </head>
   <body>
     <div id="root"></div>
+    <div id="boot-error"></div>
+    <script>
+      (function () {
+        var box = document.getElementById('boot-error');
+        function show(title, detail) {
+          box.style.display = 'block';
+          box.textContent = title + '\n\n' + (detail || '');
+        }
+        window.addEventListener('error', function (event) {
+          show('Virtua failed to start.', (event.message || 'Unknown error') + '\n' + (event.filename || '') + ':' + (event.lineno || 0));
+        });
+        window.addEventListener('unhandledrejection', function (event) {
+          show('Virtua failed to start.', String((event.reason && event.reason.message) || event.reason || 'Unknown promise rejection'));
+        });
+      })();
+    </script>
     <script type="module" src="/main.tsx"></script>
   </body>
 </html>
