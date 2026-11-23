@@ -17,11 +17,24 @@ export default function MobileHost({ mode, controls }: Props) {
   const [showSetup, setShowSetup] = useState(false)
   const [setupNotice, setSetupNotice] = useState('')
   const [modelInfo, setModelInfo] = useState('')
+  const [modeBusy, setModeBusy] = useState(false)
 
   useEffect(() => controls.onLinkStatus(setStatus), [controls])
 
   const report = (error: unknown): void => {
     setSetupNotice(error instanceof Error ? error.message : String(error))
+  }
+
+  const switchMode = async (next: MobileMode): Promise<void> => {
+    setModeBusy(true)
+    setSetupNotice('')
+    try {
+      await controls.setMode(next)
+    } catch (error) {
+      report(error)
+    } finally {
+      setModeBusy(false)
+    }
   }
 
   const listModels = async (): Promise<void> => {
@@ -126,22 +139,26 @@ export default function MobileHost({ mode, controls }: Props) {
                   <button
                     type="button"
                     className={mode === 'local' ? 'active' : ''}
-                    onClick={() => controls.setMode('local')}
+                    disabled={modeBusy}
+                    onClick={() => void switchMode('local')}
                   >
                     Phone
                   </button>
                   <button
                     type="button"
                     className={mode === 'linked' ? 'active' : ''}
-                    onClick={() => controls.setMode('linked')}
+                    disabled={modeBusy}
+                    onClick={() => void switchMode('linked')}
                   >
                     Desktop link
                   </button>
                 </div>
                 <p className="sheet-hint">
-                  {mode === 'local'
-                    ? 'GGUF models and data stay on this phone. No PC or internet needed.'
-                    : 'Uses your desktop over LAN or Tailscale. No cloud relay.'}
+                  {modeBusy
+                    ? 'Copying your current avatar to this phone and switching…'
+                    : mode === 'local'
+                      ? 'GGUF models and data stay on this phone. No PC or internet needed.'
+                      : 'Uses your desktop over LAN or Tailscale. No cloud relay.'}
                 </p>
               </div>
 

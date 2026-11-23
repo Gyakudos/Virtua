@@ -6,7 +6,7 @@ export type MobileMode = 'local' | 'linked'
 
 export interface MobileControls {
   mode(): MobileMode
-  setMode(mode: MobileMode): void
+  setMode(mode: MobileMode): Promise<void>
   linkStatus(): LinkStatus
   linkError(): string
   onLinkStatus(listener: (status: LinkStatus) => void): () => void

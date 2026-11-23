@@ -204,6 +204,7 @@ export interface LocalController {
   models(): Promise<NativeModel[]>
   pickModel(): Promise<NativeModel>
   avatars(): Promise<NativeAvatar[]>
+  saveAvatar(fileName: string, dataBase64: string): Promise<NativeAvatar>
   importBundle(): Promise<BackupSummary>
   exportBundle(): Promise<void>
 }
@@ -522,6 +523,15 @@ export function createLocalApi(): { api: Window['api']; controller: LocalControl
     models: () => callNative<NativeModel[]>('models'),
     pickModel: async () => callNative<NativeModel>('pickModel'),
     avatars: () => callNative<NativeAvatar[]>('listAvatars'),
+    saveAvatar: async (fileName, dataBase64) => {
+      const saved = await callNative<NativeAvatar>('saveAvatar', { fileName, dataBase64 })
+      vrmCache.set(saved.path, {
+        name: saved.name,
+        path: saved.path,
+        data: bytesFromBase64(dataBase64)
+      })
+      return saved
+    },
     importBundle,
     exportBundle
   }

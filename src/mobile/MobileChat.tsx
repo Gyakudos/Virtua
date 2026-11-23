@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type {
   AvatarConfig, AvatarState, Character, Conversation, OllamaHealth, Persona, StoredMessage, StreamHandlers
 } from '../shared/types'
+import { AVATAR_MODE_NOTICE_KEY } from './api'
 import type { NativeAvatar } from './localApi'
 import type { MobileControls, MobileMode } from './mobile'
 import MobileAvatarPanel from './MobileAvatarPanel'
@@ -114,6 +115,13 @@ export default function MobileChat({ kind, controls, mode }: Props) {
     })
     return () => { alive = false }
   }, [controls])
+
+  useEffect(() => {
+    const notice = localStorage.getItem(AVATAR_MODE_NOTICE_KEY)
+    if (!notice) return
+    localStorage.removeItem(AVATAR_MODE_NOTICE_KEY)
+    setNotice(notice)
+  }, [])
 
   const report = (error: unknown): void => {
     setNotice(error instanceof Error ? error.message : String(error))
