@@ -100,7 +100,8 @@ A local-first WebView app under `android/` reuses the same React UI through a Ko
 The [latest release `000.015.002.2026`](https://github.com/Gyakudos/Virtua/releases/tag/000.015.002.2026) contains smoke-test builds:
 
 - `Virtua-Setup-0.10.0-x64.exe` — Windows x64 setup. It is unsigned, so Windows SmartScreen may require **More info → Run anyway**.
-- `app-debug.apk` — Android arm64-v8a companion APK with a local QR scanner. No VRM or GGUF model is included; import your own files on the phone.
+- `app-release.apk` — signed Android arm64-v8a release APK with a local QR scanner. No VRM or GGUF model is included; import your own files on the phone.
+- `app-release.aab` — signed Android App Bundle for store upload.
 
 The desktop manual update check uses GitHub's latest release and still falls back to the version tag if needed.
 

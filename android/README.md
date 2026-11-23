@@ -7,12 +7,17 @@ app-private storage; there is no telemetry or cloud dependency.
 
 ```powershell
 cd F:\Virtual Assistant\android
-.\gradlew.bat assembleDebug
+.\gradlew.bat clean assembleRelease bundleRelease
 ```
 
-Output: `app/build/outputs/apk/debug/app-debug.apk`
+Outputs:
 
-`sdk.dir` is set in the (git-ignored) `local.properties` to `F:\dev\android-sdk`.
+- `app/build/outputs/apk/release/app-release.apk` — signed, installable release APK
+- `app/build/outputs/bundle/release/app-release.aab` — signed App Bundle for stores
+
+`sdk.dir` plus the release keystore path and passwords are stored in the git-ignored
+`local.properties`. The self-signed keystore is `android/virtua-release.jks` (also git-ignored);
+back it up — future update signatures must use the same key.
 
 ## Web assets
 

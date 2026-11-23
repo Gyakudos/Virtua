@@ -246,7 +246,7 @@ Warmth, curiosity, humor, shyness, formality, energy, empathy, stubbornness, pla
 | **9a. Android migration foundation** ✅ | Transactional backup restore + Android bundle export (JSON + copied `.vrm` files) | Implemented |
 | **9b. Linked Android companion** ✅ | Desktop bridge over LAN/Tailscale, shared React renderer with an Android `window.api` adapter, SAF import | Implemented |
 | **9c. Standalone Android mode** ✅ | On-device storage + GGUF/`llama.cpp` inference behind the same API contract, SAF model/VRM import, Android TTS | Implemented |
-| **10. Smoke-test release** ✅ | Windows NSIS setup, Android debug APK, GitHub release `000.015.002.2026`, manual update check, PC Port panel with Pair New/Sync/Trusted Devices | Implemented |
+| **10. Smoke-test release** ✅ | Windows NSIS setup, signed Android release APK + AAB, GitHub release `000.015.002.2026`, manual update check, PC Port panel with Pair New/Sync/Trusted Devices | Implemented |
 
 Phases 0–2 = "useful assistant". Phases 3–6 = "yours". Phase 9 is phased as linked-first, standalone-second.
 

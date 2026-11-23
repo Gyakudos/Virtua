@@ -13,8 +13,11 @@ captures/
 *.gguf
 *.db
 
-# Android: local SDK path, caches, build outputs, generated web assets
+# Android: local SDK path, signing secrets, caches, build outputs, generated web assets
 android/local.properties
+*.jks
+*.keystore
+*.p12
 android/.gradle/
 android/build/
 android/app/build/
