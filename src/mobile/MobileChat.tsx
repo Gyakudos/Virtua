@@ -34,6 +34,12 @@ function titleFor(text: string): string {
   return text.length > 38 ? `${text.slice(0, 38)}…` : text
 }
 
+function resizeComposer(element: HTMLTextAreaElement | null): void {
+  if (!element) return
+  element.style.height = 'auto'
+  element.style.height = `${Math.min(element.scrollHeight, 140)}px`
+}
+
 function buildCharacterPrompt(character: Character, ooc: boolean): string {
   const traits = Object.entries(character.traits)
     .filter(([, value]) => value > 0)
@@ -302,6 +308,7 @@ export default function MobileChat({ kind, controls, mode }: Props) {
     setBusy(true)
     setNotice(null)
     setInput('')
+    resizeComposer(textareaRef.current)
     try {
       let conversationId = activeId
       if (!conversationId) {
@@ -444,7 +451,11 @@ export default function MobileChat({ kind, controls, mode }: Props) {
           rows={1}
           value={input}
           placeholder={kind === 'rp' ? 'Write your next line…' : 'Message Virtua…'}
-          onChange={(event) => setInput(event.target.value)}
+          onChange={(event) => {
+            setInput(event.target.value)
+            resizeComposer(event.target)
+          }}
+          onFocus={(event) => resizeComposer(event.currentTarget)}
           onKeyDown={onComposerKeyDown}
         />
         {streaming ? (
