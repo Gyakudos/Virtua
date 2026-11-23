@@ -70,7 +70,7 @@ A strictly local-only desktop assistant. No cloud APIs, no telemetry, no runtime
   - **Restore** — replace local data from a previously exported JSON snapshot in one transaction
   - **Export for Android…** — writes the versioned JSON snapshot plus a copy of every referenced `.vrm` avatar into a folder you choose. Copy that folder to the phone for the Android importer; avatar files are never bundled inside the app itself
   - **Android bridge** — opt-in local WebSocket on port `8787`, loopback by default with an optional LAN bind. A pairing token is required; there is no cloud relay
-  - **GitHub update check** — a manual button contacts GitHub only when clicked and can open the matching release page. Release tags use `000.0015.000.2026` (Major.Minor.Sub.Year)
+  - **GitHub update check** — a manual button contacts GitHub only when clicked and can open the matching release page. Release tags use `000.015.002.2026` (Major.Minor.Sub.Year)
   - Reminders fire as local OS notifications within 5 minutes of their time
 - **Local voice:** click **Voice** in the toolbar (or type `/voice`)
   - **Text-to-speech:** Windows SAPI (built in, no download) or an optional local Piper executable/model you provide; audio is generated on this PC and played in the app
@@ -97,7 +97,7 @@ A local-first WebView app under `android/` reuses the same React UI through a Ko
 
 ## Downloads
 
-The [latest release `000.0015.000.2026`](https://github.com/Gyakudos/Virtua/releases/tag/000.0015.000.2026) contains smoke-test builds:
+The [latest release `000.015.002.2026`](https://github.com/Gyakudos/Virtua/releases/tag/000.015.002.2026) contains smoke-test builds:
 
 - `Virtua-Setup-0.10.0-x64.exe` — Windows x64 setup. It is unsigned, so Windows SmartScreen may require **More info → Run anyway**.
 - `app-debug.apk` — Android arm64-v8a companion APK with a local QR scanner. No VRM or GGUF model is included; import your own files on the phone.
