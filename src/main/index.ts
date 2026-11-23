@@ -394,7 +394,7 @@ function registerIpc(): void {
   ipcMain.handle('update:check', () => updates.checkForUpdate())
   ipcMain.handle('update:open', (_event, url: string) => updates.openUpdate(url))
 
-  ipcMain.handle('sync:pull', () => store.buildBackupPayload(BUILD_VERSION))
+  ipcMain.handle('sync:pull', () => polish.buildMobilePullPayload())
   ipcMain.handle('sync:push', (_event, payload: unknown) => store.restoreBackup(payload))
 
   ipcMain.handle('bridge:config', () => bridgeConfig())

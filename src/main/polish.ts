@@ -146,6 +146,11 @@ function collectAvatarPaths(payload: BackupPayload): string[] {
   return Array.from(paths)
 }
 
+interface AvatarAssets {
+  avatars: NonNullable<BackupPayload['avatars']>
+  avatarFiles: NonNullable<BackupPayload['avatarFiles']>
+}
+
 function uniqueAvatarName(sourcePath: string, used: Set<string>): string {
   const raw = basename(sourcePath).replace(/[^a-zA-Z0-9._-]/g, '_')
   const base = raw.toLowerCase().endsWith('.vrm') ? raw.slice(0, -4) : raw
@@ -159,6 +164,28 @@ function uniqueAvatarName(sourcePath: string, used: Set<string>): string {
   return candidate
 }
 
+/** Collect referenced .vrm files once for both folder bundles and local bridge pushes. */
+function collectAvatarAssets(payload: BackupPayload): AvatarAssets {
+  const used = new Set<string>()
+  const avatars: AvatarAssets['avatars'] = []
+  const avatarFiles: AvatarAssets['avatarFiles'] = []
+  for (const sourcePath of collectAvatarPaths(payload)) {
+    if (isCredentialPath(sourcePath) || !existsSync(sourcePath)) continue
+    if (extname(sourcePath).toLowerCase() !== '.vrm') continue
+    const fileName = uniqueAvatarName(sourcePath, used)
+    avatars.push({ sourcePath, fileName })
+    avatarFiles.push({ fileName, dataBase64: readFileSync(sourcePath).toString('base64') })
+  }
+  return { avatars, avatarFiles }
+}
+
+/** Snapshot used by the local phone bridge; includes real VRM bytes, not just paths. */
+export function buildMobilePullPayload(): BackupPayload {
+  const payload = store.buildBackupPayload(BUILD_VERSION)
+  const assets = collectAvatarAssets(payload)
+  return { ...payload, avatars: assets.avatars, avatarFiles: assets.avatarFiles }
+}
+
 /** Export a versioned JSON snapshot plus the actual .vrm files for Android import. */
 export function exportMobileBundle(): { path: string; avatars: number } | null {
   const folders = dialog.showOpenDialogSync({
@@ -169,20 +196,20 @@ export function exportMobileBundle(): { path: string; avatars: number } | null {
 
   const folder = folders[0]
   const payload = store.buildBackupPayload(BUILD_VERSION)
+  const assets = collectAvatarAssets(payload)
   const avatarFolder = join(folder, 'avatars')
   mkdirSync(avatarFolder, { recursive: true })
-  const used = new Set<string>()
-  const avatars: NonNullable<BackupPayload['avatars']> = []
-  for (const sourcePath of collectAvatarPaths(payload)) {
-    if (isCredentialPath(sourcePath) || !existsSync(sourcePath)) continue
-    if (extname(sourcePath).toLowerCase() !== '.vrm') continue
-    const fileName = uniqueAvatarName(sourcePath, used)
-    copyFileSync(sourcePath, join(avatarFolder, fileName))
-    avatars.push({ sourcePath, fileName })
+  for (const avatar of assets.avatars) {
+    copyFileSync(avatar.sourcePath, join(avatarFolder, avatar.fileName))
   }
 
-  const bundle: BackupPayload = { ...payload, format: 2, avatars }
+  const bundle: BackupPayload = {
+    ...payload,
+    format: 2,
+    avatars: assets.avatars,
+    avatarFiles: assets.avatarFiles
+  }
   const path = join(folder, `virtual-assistant-android-${new Date().toISOString().slice(0, 10)}.json`)
   writeFileSync(path, JSON.stringify(bundle, null, 2), 'utf8')
-  return { path, avatars: avatars.length }
+  return { path, avatars: assets.avatars.length }
 }

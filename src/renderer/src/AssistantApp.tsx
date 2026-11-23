@@ -422,7 +422,9 @@ export default function AssistantApp() {
       if (!bridge?.phoneConnected) throw new Error('No phone is connected. Pair and connect a phone first.')
       const payload = await window.api.sync.pull()
       const summary = await callPeer('port.receive', [payload]) as BackupSummary
-      setSystemMessage(`Ported to phone: ${summary.conversations} chats, ${summary.messages} messages.`)
+      setSystemMessage(
+        `Ported to phone: ${summary.conversations} chats, ${summary.messages} messages, ${summary.avatars ?? 0} avatars.`
+      )
     } catch (cause) { systemError(cause) } finally {
       setSyncBusy(false)
     }

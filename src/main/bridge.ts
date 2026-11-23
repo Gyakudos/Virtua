@@ -234,7 +234,8 @@ export function startBridge(): BridgeStatus {
     response.end('Virtual Assistant bridge. Connect with /bridge?role=desktop|phone&token=...\n')
   })
 
-  wss = new WebSocketServer({ noServer: true })
+  // PC pushes include base64 VRM bytes, which can easily exceed ws's 100 MB default.
+  wss = new WebSocketServer({ noServer: true, maxPayload: 512 * 1024 * 1024 })
   server.on('upgrade', (request, socket, head) => {
     let url: URL
     try {

@@ -1,6 +1,6 @@
 import type { BackupPayload, BackupSummary, TrustedDevice } from '../shared/types'
 import type { LinkConfig, LinkStatus } from './linkedApi'
-import type { NativeModel } from './localApi'
+import type { NativeAvatar, NativeModel } from './localApi'
 
 export type MobileMode = 'local' | 'linked'
 
@@ -17,6 +17,7 @@ export interface MobileControls {
   scanQr(): Promise<string>
   models(): Promise<NativeModel[]>
   pickModel(): Promise<NativeModel>
+  avatarFiles(): Promise<NativeAvatar[]>
   importBundle(): Promise<BackupSummary>
   exportBundle(): Promise<void>
   importPayload(payload: BackupPayload): Promise<BackupSummary>

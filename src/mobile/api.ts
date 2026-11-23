@@ -1,6 +1,6 @@
 import type { BackupPayload, BackupSummary } from '../shared/types'
 import { createLinkedApi, readLinkConfig, type LinkConfig, type LinkStatus } from './linkedApi'
-import { createLocalApi, summarizePayload } from './localApi'
+import { createLocalApi, importPayloadWithAvatars } from './localApi'
 import * as store from './localStore'
 import type { MobileControls, MobileMode } from './mobile'
 import { consumePairIntent, scanQrCode } from './native'
@@ -40,10 +40,8 @@ export function installMobileApi(): { mode: MobileMode; controls: MobileControls
   const linked = createLinkedApi(mode === 'linked', local.api)
   window.api = mode === 'linked' ? linked.api : local.api
 
-  const importPayload = async (payload: BackupPayload): Promise<BackupSummary> => {
-    store.importBundle(payload)
-    return summarizePayload(payload)
-  }
+  const importPayload = async (payload: BackupPayload): Promise<BackupSummary> =>
+    importPayloadWithAvatars(payload)
 
   const controls: MobileControls = {
     mode: () => mode,
@@ -75,6 +73,7 @@ export function installMobileApi(): { mode: MobileMode; controls: MobileControls
     },
     models: () => local.controller.models(),
     pickModel: () => local.controller.pickModel(),
+    avatarFiles: () => local.controller.avatars(),
     importBundle: () => local.controller.importBundle(),
     exportBundle: () => local.controller.exportBundle(),
     importPayload,

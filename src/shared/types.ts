@@ -371,6 +371,8 @@ export interface BackupPayload {
   settings: Array<{ key: string; value: string }>
   /** Present in Android bundles: copied .vrm files referenced by avatar settings/characters. */
   avatars?: Array<{ sourcePath: string; fileName: string }>
+  /** Base64 VRM bytes sent over the local bridge so a PC push also delivers avatars. */
+  avatarFiles?: Array<{ fileName: string; dataBase64: string }>
 }
 
 export interface BackupSummary {

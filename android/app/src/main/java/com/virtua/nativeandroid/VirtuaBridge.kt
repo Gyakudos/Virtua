@@ -95,6 +95,9 @@ class VirtuaBridge(
             "complete" -> complete(args, callbackId)
             "cancel" -> cancel(args)
             "pickVrm" -> launchOnMain { activity.launchPickVrm(callbackId) }
+            "listAvatars" -> listAvatars()
+            "readVrm" -> readVrm(args)
+            "saveAvatar" -> saveAvatar(args)
             "scanQr" -> launchOnMain { activity.launchQrScanner(callbackId) }
             "speak" -> speak(args.optString("text"))
             "importBundleFromSaf" -> launchOnMain { activity.launchImportBundle(callbackId) }
@@ -137,6 +140,70 @@ class VirtuaBridge(
         val destination = copyToPrivate(uri, modelsDir, displayName, ".gguf")
         JSONObject()
             .put("name", displayName)
+            .put("path", destination.absolutePath)
+            .put("size", destination.length())
+    }
+
+    private fun listAvatars(): JSONArray {
+        val dir = avatarsDir
+        if (!dir.exists()) return JSONArray()
+        return JSONArray().apply {
+            dir.listFiles()
+                ?.filter { it.isFile && it.name.endsWith(".vrm", ignoreCase = true) }
+                ?.sortedBy { it.name.lowercase(Locale.ROOT) }
+                ?.forEach { file ->
+                    put(
+                        JSONObject()
+                            .put("name", file.name)
+                            .put("path", file.absolutePath)
+                            .put("size", file.length()),
+                    )
+                }
+        }
+    }
+
+    private fun readVrm(args: JSONObject): JSONObject {
+        val requested = args.optString("path").takeIf { it.isNotBlank() }
+            ?: throw IllegalArgumentException("readVrm requires a path")
+        val file = File(requested)
+        val root = avatarsDir.canonicalPath + File.separator
+        if (!file.canonicalPath.startsWith(root)) {
+            throw SecurityException("Only app-private avatar files can be read.")
+        }
+        if (!file.isFile) throw IllegalArgumentException("Avatar file not found: $requested")
+        return JSONObject()
+            .put("name", file.name)
+            .put("path", file.absolutePath)
+            .put("dataBase64", encodeBase64(file))
+    }
+
+    private fun saveAvatar(args: JSONObject): JSONObject {
+        val fileName = args.optString("fileName").takeIf { it.isNotBlank() }
+            ?: throw IllegalArgumentException("saveAvatar requires a fileName")
+        val encoded = args.optString("dataBase64").takeIf { it.isNotBlank() }
+            ?: throw IllegalArgumentException("saveAvatar requires dataBase64")
+        val bytes = Base64.decode(encoded, Base64.NO_WRAP)
+        if (bytes.isEmpty()) throw IllegalArgumentException("Avatar file is empty")
+
+        val dir = avatarsDir
+        if (!dir.exists() && !dir.mkdirs()) {
+            throw IllegalStateException("Cannot create ${dir.absolutePath}")
+        }
+
+        val targetName = safeFileName(fileName, ".vrm")
+        val exact = File(dir, targetName)
+        // A repeated PC push should not accumulate duplicate copies of the same avatar.
+        if (exact.isFile && exact.length() == bytes.size.toLong() && exact.readBytes().contentEquals(bytes)) {
+            return JSONObject()
+                .put("name", exact.name)
+                .put("path", exact.absolutePath)
+                .put("size", exact.length())
+        }
+
+        val destination = uniqueFile(dir, targetName)
+        FileOutputStream(destination).use { it.write(bytes) }
+        return JSONObject()
+            .put("name", destination.name)
             .put("path", destination.absolutePath)
             .put("size", destination.length())
     }

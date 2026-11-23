@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type {
-  Character, Conversation, OllamaHealth, Persona, StoredMessage, StreamHandlers
+  AvatarConfig, AvatarState, Character, Conversation, OllamaHealth, Persona, StoredMessage, StreamHandlers
 } from '../shared/types'
+import type { NativeAvatar } from './localApi'
 import type { MobileControls, MobileMode } from './mobile'
+import MobileAvatarPanel from './MobileAvatarPanel'
 
 type ChatKind = 'assistant' | 'rp'
-type Sheet = 'chats' | 'model' | null
+type Sheet = 'chats' | 'model' | 'avatar' | null
 
 interface Props {
   kind: ChatKind
@@ -32,6 +34,13 @@ function timeLabel(timestamp: number): string {
 
 function titleFor(text: string): string {
   return text.length > 38 ? `${text.slice(0, 38)}…` : text
+}
+
+const DEFAULT_AVATAR: AvatarConfig = {
+  visible: true,
+  quality: 'low',
+  vrmPath: null,
+  zoom: 1
 }
 
 function resizeComposer(element: HTMLTextAreaElement | null): void {
@@ -79,6 +88,9 @@ export default function MobileChat({ kind, controls, mode }: Props) {
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
   const [sheet, setSheet] = useState<Sheet>(null)
+  const [avatarConfig, setAvatarConfig] = useState<AvatarConfig>(DEFAULT_AVATAR)
+  const [avatarState, setAvatarState] = useState<AvatarState>('idle')
+  const [avatarFiles, setAvatarFiles] = useState<NativeAvatar[]>([])
 
   const modelRef = useRef(model)
   const partialRef = useRef('')
@@ -90,8 +102,22 @@ export default function MobileChat({ kind, controls, mode }: Props) {
 
   useEffect(() => { modelRef.current = model }, [model])
 
+  useEffect(() => {
+    let alive = true
+    void Promise.all([
+      window.api.avatar.getConfig().catch(() => DEFAULT_AVATAR),
+      controls.avatarFiles().catch(() => [] as NativeAvatar[])
+    ]).then(([config, files]) => {
+      if (!alive) return
+      setAvatarConfig({ ...config, visible: true })
+      setAvatarFiles(files)
+    })
+    return () => { alive = false }
+  }, [controls])
+
   const report = (error: unknown): void => {
     setNotice(error instanceof Error ? error.message : String(error))
+    setAvatarState('error')
   }
 
   const refresh = useCallback(async () => {
@@ -166,6 +192,38 @@ export default function MobileChat({ kind, controls, mode }: Props) {
     localStorage.setItem(modelKey, name)
     setSheet(null)
     setNotice(null)
+  }
+
+  const refreshAvatarFiles = async (): Promise<void> => {
+    try {
+      setAvatarFiles(await controls.avatarFiles())
+    } catch (error) {
+      report(error)
+    }
+  }
+
+  const patchAvatar = (patch: Partial<AvatarConfig>): void => {
+    const next = { ...avatarConfig, ...patch, visible: true }
+    setAvatarConfig(next)
+    void window.api.avatar.setConfig(next).catch(report)
+  }
+
+  const openAvatar = (): void => {
+    void refreshAvatarFiles()
+    setSheet('avatar')
+  }
+
+  const importVrm = async (): Promise<void> => {
+    try {
+      const file = await window.api.avatar.pickVrm()
+      if (file) {
+        patchAvatar({ vrmPath: file.path })
+        await refreshAvatarFiles()
+        setNotice('VRM imported. It stays on this phone.')
+      }
+    } catch (error) {
+      report(error)
+    }
   }
 
   const importModel = async (): Promise<void> => {
@@ -256,6 +314,7 @@ export default function MobileChat({ kind, controls, mode }: Props) {
     setStreaming(false)
     requestRef.current = null
     unsubscribeRef.current = null
+    setAvatarState(failed ? 'error' : 'idle')
     if (!failed) setNotice(null)
   }
 
@@ -279,10 +338,12 @@ export default function MobileChat({ kind, controls, mode }: Props) {
     cancelledRef.current = false
     setStreaming(true)
     setNotice(null)
+    setAvatarState('thinking')
 
     const handlers: StreamHandlers = {
       onChunk: (chunk) => {
         partialRef.current += chunk
+        setAvatarState('speaking')
         const content = partialRef.current
         setMessages((previous) => previous.map((item) => item.id === assistantId ? { ...item, content } : item))
       },
@@ -307,6 +368,7 @@ export default function MobileChat({ kind, controls, mode }: Props) {
 
     setBusy(true)
     setNotice(null)
+    setAvatarState('listening')
     setInput('')
     resizeComposer(textareaRef.current)
     try {
@@ -356,6 +418,7 @@ export default function MobileChat({ kind, controls, mode }: Props) {
     unsubscribeRef.current?.()
     if (requestId) void window.api.cancel(requestId).catch(() => undefined)
     setStreaming(false)
+    setAvatarState('idle')
     setNotice('Stopped.')
   }
 
@@ -396,6 +459,13 @@ export default function MobileChat({ kind, controls, mode }: Props) {
           <button type="button" onClick={() => setNotice(null)} aria-label="Dismiss">×</button>
         </div>
       )}
+
+      <MobileAvatarPanel
+        state={avatarState}
+        config={avatarConfig}
+        onPatch={patchAvatar}
+        onOpen={openAvatar}
+      />
 
       <div className="chat-scroll">
         {messages.length === 0 ? (
@@ -474,9 +544,13 @@ export default function MobileChat({ kind, controls, mode }: Props) {
 
       {sheet && (
         <div className="sheet-backdrop" onClick={() => setSheet(null)}>
-          <section className="sheet" onClick={(event) => event.stopPropagation()} aria-label={sheet === 'chats' ? 'Chats' : 'Models'}>
+          <section
+            className="sheet"
+            onClick={(event) => event.stopPropagation()}
+            aria-label={sheet === 'chats' ? 'Chats' : sheet === 'avatar' ? 'Avatar' : 'Models'}
+          >
             <header className="sheet-head">
-              <strong>{sheet === 'chats' ? 'Chats & people' : 'Model'}</strong>
+              <strong>{sheet === 'chats' ? 'Chats & people' : sheet === 'avatar' ? 'Avatar' : 'Model'}</strong>
               <button type="button" onClick={() => setSheet(null)}>Close</button>
             </header>
             <div className="sheet-body">
@@ -540,6 +614,94 @@ export default function MobileChat({ kind, controls, mode }: Props) {
                         </button>
                       </div>
                     ))}
+                  </div>
+                </>
+              )}
+
+              {sheet === 'avatar' && (
+                <>
+                  <div className="status-card">
+                    <strong>{avatarConfig.vrmPath ? 'Local VRM selected' : '2D sprite active'}</strong>
+                    <small>
+                      {avatarConfig.vrmPath
+                        ? 'The model renders on this phone. No cloud upload.'
+                        : mode === 'linked'
+                          ? 'Choose a VRM on the linked desktop.'
+                          : 'Load a .vrm here or use PC Port → Sync to import one.'}
+                    </small>
+                  </div>
+
+                  <div className="setup-actions">
+                    <button type="button" className="sync-button primary" onClick={() => void importVrm()}>
+                      {mode === 'local' ? 'Import .vrm from phone' : 'Choose .vrm on desktop'}
+                    </button>
+                    {avatarConfig.vrmPath && (
+                      <button type="button" className="sync-button" onClick={() => patchAvatar({ vrmPath: null })}>
+                        Use 2D sprite
+                      </button>
+                    )}
+                  </div>
+
+                  {mode === 'local' ? (
+                    <div className="sheet-group">
+                      <h4>Avatar files on this phone</h4>
+                      {avatarFiles.length === 0 ? (
+                        <p className="sheet-hint">No VRM imported yet. Imported files stay app-private and reload after restart.</p>
+                      ) : avatarFiles.map((file) => {
+                        const active = avatarConfig.vrmPath === file.path
+                        return (
+                          <button
+                            key={file.path}
+                            type="button"
+                            className={`sheet-row ${active ? 'selected' : ''}`}
+                            onClick={() => {
+                              patchAvatar({ vrmPath: file.path })
+                              setSheet(null)
+                            }}
+                          >
+                            <span>{file.name}</span>
+                            <small>{file.size ? `${(file.size / 1_000_000).toFixed(1)} MB` : 'local file'}</small>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <p className="sheet-hint">
+                      Linked mode renders the desktop’s currently selected VRM. Switch to Phone mode to use VRM files stored here.
+                    </p>
+                  )}
+
+                  <div className="sheet-group">
+                    <h4>Preview</h4>
+                    <p className="sheet-hint">Pinch/scroll over the preview in chat to zoom. Quality changes apply immediately.</p>
+                    <div className="segmented">
+                      <button
+                        type="button"
+                        className={avatarConfig.quality === 'low' ? 'active' : ''}
+                        onClick={() => patchAvatar({ quality: 'low' })}
+                      >
+                        Low · 30 FPS
+                      </button>
+                      <button
+                        type="button"
+                        className={avatarConfig.quality === 'high' ? 'active' : ''}
+                        onClick={() => patchAvatar({ quality: 'high' })}
+                      >
+                        High · 60 FPS
+                      </button>
+                    </div>
+                    <label className="avatar-zoom-label" htmlFor={`avatar-zoom-${kind}`}>
+                      Zoom · {Math.round(avatarConfig.zoom * 100)}%
+                    </label>
+                    <input
+                      id={`avatar-zoom-${kind}`}
+                      type="range"
+                      min={0.6}
+                      max={2.5}
+                      step={0.05}
+                      value={avatarConfig.zoom}
+                      onChange={(event) => patchAvatar({ zoom: Number(event.target.value) })}
+                    />
                   </div>
                 </>
               )}

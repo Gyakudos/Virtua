@@ -14,10 +14,16 @@ export interface NativeModel {
   size?: number
 }
 
+export interface NativeAvatar {
+  name: string
+  path: string
+  size?: number
+}
+
 interface ImportedAvatar {
   fileName: string
   path: string
-  dataBase64: string
+  dataBase64?: string
 }
 
 const vrmCache = new Map<string, VrmFileInfo>()
@@ -136,6 +142,41 @@ function remapAvatars(payload: BackupPayload, avatars: ImportedAvatar[]): Backup
   return payload
 }
 
+/** Save VRM bytes delivered by a PC push into the phone's app-private avatar folder. */
+async function importAvatarFiles(payload: BackupPayload): Promise<ImportedAvatar[]> {
+  const files = payload.avatarFiles ?? []
+  if (files.length === 0 || !nativeAvailable()) return []
+  const imported: ImportedAvatar[] = []
+  for (const file of files) {
+    try {
+      const saved = await callNative<{ name: string; path: string }>('saveAvatar', {
+        fileName: file.fileName,
+        dataBase64: file.dataBase64
+      })
+      imported.push({ fileName: saved.name, path: saved.path, dataBase64: file.dataBase64 })
+      vrmCache.set(saved.path, {
+        name: saved.name,
+        path: saved.path,
+        data: bytesFromBase64(file.dataBase64)
+      })
+    } catch (error) {
+      console.warn('[mobile] could not import an avatar from the PC snapshot:', error)
+    }
+  }
+  return imported
+}
+
+/** Import a snapshot that may contain avatar bytes (local bridge pull or phone port.receive). */
+export async function importPayloadWithAvatars(payload: BackupPayload): Promise<BackupSummary> {
+  if (!payload || typeof payload !== 'object' || !Array.isArray(payload.conversations)) {
+    throw new Error('Invalid backup payload.')
+  }
+  const imported = await importAvatarFiles(payload)
+  const next = remapAvatars(payload, imported)
+  store.importBundle(next)
+  return summarizePayload(next)
+}
+
 function silentWav(): Uint8Array {
   const bytes = new Uint8Array(44)
   const view = new DataView(bytes.buffer)
@@ -162,6 +203,7 @@ export interface LocalController {
   status(): 'ready' | 'native-unavailable'
   models(): Promise<NativeModel[]>
   pickModel(): Promise<NativeModel>
+  avatars(): Promise<NativeAvatar[]>
   importBundle(): Promise<BackupSummary>
   exportBundle(): Promise<void>
 }
@@ -170,7 +212,17 @@ export function createLocalApi(): { api: Window['api']; controller: LocalControl
   const importBundle = async (): Promise<BackupSummary> => {
     const result = await callNative<{ json: string; avatars: ImportedAvatar[] }>('importBundleFromSaf')
     const payload = JSON.parse(result.json) as BackupPayload
-    store.importBundle(remapAvatars(payload, result.avatars ?? []))
+    const avatars = result.avatars ?? []
+    for (const avatar of avatars) {
+      if (!avatar.dataBase64) continue
+      vrmCache.set(avatar.path, {
+        name: avatar.fileName,
+        path: avatar.path,
+        data: bytesFromBase64(avatar.dataBase64)
+      })
+    }
+    const next = remapAvatars(payload, avatars)
+    store.importBundle(next)
     return summarizePayload(store.exportBundle())
   }
 
@@ -359,7 +411,14 @@ export function createLocalApi(): { api: Window['api']; controller: LocalControl
         const path = String(args[0])
         const cached = vrmCache.get(path)
         if (cached) return cached
-        throw new Error('Select the VRM again on this phone; files are kept app-private.')
+        const result = await callNative<{ name: string; path: string; dataBase64: string }>('readVrm', { path })
+        const info: VrmFileInfo = {
+          name: result.name,
+          path: result.path,
+          data: bytesFromBase64(result.dataBase64)
+        }
+        vrmCache.set(info.path, info)
+        return info
       }
 
       case 'images.ocrClipboard':
@@ -427,8 +486,7 @@ export function createLocalApi(): { api: Window['api']; controller: LocalControl
       case 'port.receive': {
         const payload = args[0] as BackupPayload
         if (!payload || typeof payload !== 'object') throw new Error('Invalid portable snapshot.')
-        store.importBundle(payload)
-        return summarizePayload(payload)
+        return await importPayloadWithAvatars(payload)
       }
 
       default:
@@ -463,6 +521,7 @@ export function createLocalApi(): { api: Window['api']; controller: LocalControl
     status: () => nativeAvailable() ? 'ready' : 'native-unavailable',
     models: () => callNative<NativeModel[]>('models'),
     pickModel: async () => callNative<NativeModel>('pickModel'),
+    avatars: () => callNative<NativeAvatar[]>('listAvatars'),
     importBundle,
     exportBundle
   }
