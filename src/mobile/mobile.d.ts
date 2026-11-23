@@ -1,0 +1,29 @@
+import type { BackupPayload, BackupSummary } from '../shared/types'
+import type { LinkConfig, LinkStatus } from './linkedApi'
+import type { NativeModel } from './localApi'
+
+export type MobileMode = 'local' | 'linked'
+
+export interface MobileControls {
+  mode(): MobileMode
+  setMode(mode: MobileMode): void
+  linkStatus(): LinkStatus
+  onLinkStatus(listener: (status: LinkStatus) => void): () => void
+  linkConfig(): LinkConfig
+  setLink(config: LinkConfig): void
+  models(): Promise<NativeModel[]>
+  pickModel(): Promise<NativeModel>
+  importBundle(): Promise<BackupSummary>
+  exportBundle(): Promise<void>
+  importPayload(payload: BackupPayload): Promise<BackupSummary>
+  pull(): Promise<BackupSummary>
+  push(): Promise<void>
+}
+
+declare global {
+  interface Window {
+    virtuaMobile: MobileControls
+  }
+}
+
+export {}

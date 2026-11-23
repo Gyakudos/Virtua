@@ -1,0 +1,21 @@
+node_modules/
+out/
+dist/
+dist-mobile/
+dist-setup/
+*.log
+.DS_Store
+.vscode/
+.env
+.env.*
+captures/
+*.vrm
+*.gguf
+*.db
+
+# Android: local SDK path, caches, build outputs, generated web assets
+android/local.properties
+android/.gradle/
+android/build/
+android/app/build/
+android/app/src/main/assets/public/
