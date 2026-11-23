@@ -23,6 +23,7 @@ export interface LinkedController {
   config(): LinkConfig
   setConfig(config: LinkConfig): void
   status(): LinkStatus
+  error(): string
   onStatus(listener: (status: LinkStatus) => void): () => void
   reconnect(): void
 }
@@ -122,14 +123,57 @@ export function createLinkedApi(
   let openPromise: Promise<void> | null = null
   let reconnectTimer: number | null = null
   let currentStatus: LinkStatus = config.url && config.token ? 'disconnected' : 'unconfigured'
+  let lastError = ''
   let sequence = 0
   const pending = new Map<string, PendingCall>()
   const active = new Map<string, ActiveCall>()
   const listeners = new Set<(status: LinkStatus) => void>()
 
-  const setStatus = (status: LinkStatus): void => {
+  const setStatus = (status: LinkStatus, error?: string): void => {
     currentStatus = status
+    if (error !== undefined) lastError = error
+    if (status !== 'error') lastError = ''
     for (const listener of listeners) listener(status)
+  }
+
+  /** Verify reachability and token before opening the WebSocket, so the phone can show a useful error. */
+  const verifyBridge = async (target: string, token: string): Promise<void> => {
+    // target is a full ws://host:8787/bridge?... URL; strip its path/query before probing.
+    const originUrl = new URL(target)
+    originUrl.protocol = originUrl.protocol === 'wss:' ? 'https:' : 'http:'
+    originUrl.pathname = '/'
+    originUrl.search = ''
+    originUrl.hash = ''
+    const origin = originUrl.origin
+    const controller = new AbortController()
+    const timer = window.setTimeout(() => controller.abort(), 5000)
+    try {
+      const health = await fetch(`${origin}/health`, { signal: controller.signal, cache: 'no-store' })
+      if (!health.ok) throw new Error('health check failed')
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      throw new Error(`Cannot reach the PC at ${origin}. Check that both devices are on the same Wi-Fi/LAN and that Windows Firewall allows port 8787. (${detail})`)
+    } finally {
+      window.clearTimeout(timer)
+    }
+
+    const checkTimer = window.setTimeout(() => controller.abort(), 5000)
+    try {
+      const check = await fetch(`${origin}/bridge/check?token=${encodeURIComponent(token)}`, {
+        signal: controller.signal,
+        cache: 'no-store'
+      })
+      const result = await check.json() as { ok?: boolean }
+      if (result.ok !== true) {
+        throw new Error('That pairing token is no longer valid. Click Pair New on the PC and scan the fresh QR.')
+      }
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('pairing token')) throw error
+      const detail = error instanceof Error ? error.message : String(error)
+      throw new Error(`Could not verify the pairing token with the PC. (${detail})`)
+    } finally {
+      window.clearTimeout(checkTimer)
+    }
   }
 
   const send = (message: Record<string, unknown>): void => {
@@ -201,52 +245,66 @@ export function createLinkedApi(
     try {
       target = bridgeUrl(config)
     } catch (error) {
-      setStatus('error')
-      return Promise.reject(error instanceof Error ? error : new Error(String(error)))
+      const message = error instanceof Error ? error.message : String(error)
+      setStatus('error', message)
+      return Promise.reject(new Error(message))
     }
 
     setStatus('connecting')
-    openPromise = new Promise<void>((resolve, reject) => {
-      let settled = false
-      const ws = new WebSocket(target)
-      socket = ws
-      const timer = window.setTimeout(() => {
-        if (settled) return
-        settled = true
-        ws.close()
-        reject(new Error('Timed out connecting to the desktop bridge.'))
-      }, 10_000)
+    openPromise = (async () => {
+      try {
+        await verifyBridge(target, config.token)
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        setStatus('error', message)
+        throw error
+      }
 
-      ws.onopen = () => {
-        if (settled) return
-        settled = true
-        window.clearTimeout(timer)
-        setStatus('connected')
-        resolve()
-      }
-      ws.onmessage = handleMessage
-      ws.onerror = () => {
-        if (settled) return
-        settled = true
-        window.clearTimeout(timer)
-        setStatus('error')
-        reject(new Error('Could not connect to the desktop bridge. Check the address, token, and LAN setting.'))
-      }
-      ws.onclose = () => {
-        window.clearTimeout(timer)
-        if (!settled) {
+      return await new Promise<void>((resolve, reject) => {
+        let settled = false
+        const ws = new WebSocket(target)
+        socket = ws
+        const timer = window.setTimeout(() => {
+          if (settled) return
           settled = true
-          reject(new Error('Desktop bridge closed the connection.'))
+          const message = 'Timed out connecting to the desktop bridge.'
+          setStatus('error', message)
+          ws.close()
+          reject(new Error(message))
+        }, 10_000)
+
+        ws.onopen = () => {
+          if (settled) return
+          settled = true
+          window.clearTimeout(timer)
+          setStatus('connected')
+          resolve()
         }
-        if (socket === ws) socket = null
-        setStatus(config.url && config.token ? 'disconnected' : 'unconfigured')
-        const failure = new Error('Desktop bridge disconnected.')
-        for (const call of pending.values()) call.reject(failure)
-        pending.clear()
-        active.clear()
-        scheduleReconnect()
-      }
-    }).finally(() => {
+        ws.onmessage = handleMessage
+        ws.onerror = () => {
+          if (settled) return
+          settled = true
+          window.clearTimeout(timer)
+          const message = 'The PC bridge refused the WebSocket. Click Pair New again and rescan the QR.'
+          setStatus('error', message)
+          reject(new Error(message))
+        }
+        ws.onclose = () => {
+          window.clearTimeout(timer)
+          if (!settled) {
+            settled = true
+            reject(new Error('Desktop bridge closed the connection.'))
+          }
+          if (socket === ws) socket = null
+          setStatus(config.url && config.token ? 'disconnected' : 'unconfigured')
+          const failure = new Error('Desktop bridge disconnected.')
+          for (const call of pending.values()) call.reject(failure)
+          pending.clear()
+          active.clear()
+          scheduleReconnect()
+        }
+      })
+    })().finally(() => {
       openPromise = null
     })
     return openPromise
@@ -299,6 +357,7 @@ export function createLinkedApi(
       void connect().catch(() => undefined)
     },
     status: () => currentStatus,
+    error: () => lastError,
     onStatus: (listener) => {
       listeners.add(listener)
       return () => listeners.delete(listener)

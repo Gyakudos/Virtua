@@ -8,6 +8,7 @@ export interface MobileControls {
   mode(): MobileMode
   setMode(mode: MobileMode): void
   linkStatus(): LinkStatus
+  linkError(): string
   onLinkStatus(listener: (status: LinkStatus) => void): () => void
   linkConfig(): LinkConfig
   setLink(config: LinkConfig): void
@@ -15,6 +16,7 @@ export interface MobileControls {
   revokeDevice(id: string): Promise<void>
   allowDevice(id: string): Promise<void>
   scanQr(): Promise<string>
+  reconnectLink(): void
   models(): Promise<NativeModel[]>
   pickModel(): Promise<NativeModel>
   avatarFiles(): Promise<NativeAvatar[]>

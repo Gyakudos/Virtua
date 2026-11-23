@@ -1352,7 +1352,12 @@ export default function AssistantApp() {
               </div>
 
               <div className="sync-devices">
-                <strong>Trusted Devices</strong>
+                <div className="sync-devices-head">
+                  <strong>Trusted Devices</strong>
+                  <small className="muted">
+                    {devices.length} paired · {devices.filter((device) => device.connected).length} connected now
+                  </small>
+                </div>
                 {devices.length === 0
                   ? <small className="muted">No phone has paired yet. Scan the QR above to add one.</small>
                   : devices.map((device) => (

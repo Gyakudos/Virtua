@@ -52,6 +52,7 @@ export function installMobileApi(): { mode: MobileMode; controls: MobileControls
       location.href = url.toString()
     },
     linkStatus: () => mode === 'linked' ? linked.controller.status() : 'unconfigured',
+    linkError: () => mode === 'linked' ? linked.controller.error() : '',
     onLinkStatus: (listener) => mode === 'linked'
       ? linked.controller.onStatus(listener)
       : () => undefined,
@@ -60,6 +61,9 @@ export function installMobileApi(): { mode: MobileMode; controls: MobileControls
     revokeDevice: async (id) => { await window.api.bridge.revokeDevice(id) },
     allowDevice: async (id) => { await window.api.bridge.allowDevice(id) },
     scanQr: () => scanQrCode(),
+    reconnectLink: () => {
+      if (mode === 'linked') linked.controller.reconnect()
+    },
     setLink: (config: LinkConfig) => {
       if (mode === 'linked') {
         linked.controller.setConfig(config)

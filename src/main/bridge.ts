@@ -226,8 +226,21 @@ export function startBridge(): BridgeStatus {
   server = createServer((request, response) => {
     const path = (request.url ?? '/').split('?')[0]
     if (path === '/health') {
-      response.writeHead(200, { 'Content-Type': 'application/json' })
+      response.writeHead(200, {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*'
+      })
       response.end(JSON.stringify({ ok: true, app: 'virtual-assistant-bridge', build: BUILD_VERSION }))
+      return
+    }
+    // Lets the phone distinguish a wrong/rotated token from a network/firewall failure.
+    if (path === '/bridge/check') {
+      const token = new URL(request.url ?? '/', 'http://localhost').searchParams.get('token')
+      response.writeHead(200, {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*'
+      })
+      response.end(JSON.stringify({ ok: token === pairingToken() }))
       return
     }
     response.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' })

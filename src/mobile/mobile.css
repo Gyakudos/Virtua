@@ -798,6 +798,16 @@ button:disabled {
   background: var(--good);
 }
 
+.bridge-error {
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid #7b3b4b;
+  background: #3a2029;
+  color: #ffd9e0;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
 .sync-button {
   flex: 1 1 auto;
   min-width: 120px;

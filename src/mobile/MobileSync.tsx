@@ -97,6 +97,14 @@ export default function MobileSync({ controls, status }: Props) {
         <div className={`sync-status ${connected ? 'connected' : ''}`}>
           <span className="model-dot" /> {status}
         </div>
+        {controls.linkError() && (
+          <div className="bridge-error" role="alert">{controls.linkError()}</div>
+        )}
+        {controls.mode() === 'linked' && !connected && (
+          <button type="button" className="sync-button small" onClick={controls.reconnectLink}>
+            Retry connection
+          </button>
+        )}
       </section>
 
       <section className="sync-card">
