@@ -374,6 +374,23 @@ body.theme-light .avatar-dock.rp-avatar-dock { background: #ffffff; border-left-
 body.theme-light .banner--warn { color: #7a5b12; }
 .system-body { gap: 4px; }
 .system-body .banner { margin-top: 8px; }
+.sync-body { display: flex; flex-direction: column; gap: 10px; }
+.sync-grid { display: grid; grid-template-columns: 140px 1fr; gap: 14px; align-items: start; }
+.sync-qr { display: flex; flex-direction: column; gap: 6px; align-items: center; }
+.sync-qr img { width: 132px; height: 132px; background: #fff; border: 1px solid #39414e; border-radius: 6px; padding: 4px; }
+.qr-placeholder { width: 132px; height: 132px; display: grid; place-items: center; border: 1px dashed #4b5563; border-radius: 6px; color: #94a3b8; font-size: 11px; text-align: center; }
+.sync-qr small { text-align: center; color: #94a3b8; }
+.sync-info { min-width: 0; }
+.sync-info .data-row { border: 0; padding: 0; }
+.sync-devices { border-top: 1px solid #2a303b; padding-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+.sync-devices .device-row { border: 0; padding: 4px 0; }
+.sync-devices code { color: #94a3b8; font-size: 10px; }
+.sync-body .banner { margin-top: 4px; }
+body.theme-light .sync-qr img { border-color: #cbd3de; }
+body.theme-light .sync-qr small,
+body.theme-light .sync-devices code { color: #64748b; }
+body.theme-light .sync-devices { border-top-color: #d8dee8; }
+body.theme-light .qr-placeholder { border-color: #cbd3de; color: #64748b; }
 .calendar-row { align-items: flex-start; }
 .calendar-description { max-width: 520px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .voice-fields { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }

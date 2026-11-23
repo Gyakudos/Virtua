@@ -1,4 +1,4 @@
-import type { BackupPayload, BackupSummary } from '../shared/types'
+import type { BackupPayload, BackupSummary, TrustedDevice } from '../shared/types'
 import type { LinkConfig, LinkStatus } from './linkedApi'
 import type { NativeModel } from './localApi'
 
@@ -11,6 +11,10 @@ export interface MobileControls {
   onLinkStatus(listener: (status: LinkStatus) => void): () => void
   linkConfig(): LinkConfig
   setLink(config: LinkConfig): void
+  trustedDevices(): Promise<TrustedDevice[]>
+  revokeDevice(id: string): Promise<void>
+  allowDevice(id: string): Promise<void>
+  scanQr(): Promise<string>
   models(): Promise<NativeModel[]>
   pickModel(): Promise<NativeModel>
   importBundle(): Promise<BackupSummary>

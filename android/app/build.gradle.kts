@@ -41,4 +41,7 @@ dependencies {
 
     // On-device GGUF inference (arm64-v8a, API 24+). Local only; no network calls.
     implementation("dev.ffmpegkit-maintained:llama-android:0.1.1")
+
+    // Local QR scanner for pairing with the desktop bridge. No cloud/ML model downloads.
+    implementation("com.journeyapps:zxing-android-embedded:4.3.0")
 }

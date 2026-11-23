@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION")
+
 package com.virtua.nativeandroid
 
 import android.annotation.SuppressLint
@@ -17,6 +19,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
+import com.google.zxing.integration.android.IntentIntegrator
+import org.json.JSONObject
 
 /**
  * Hosts the Vite-built web app from file:///android_asset/public/index.html and
@@ -32,6 +36,7 @@ class MainActivity : ComponentActivity() {
     private val pendingVrmIds = ArrayDeque<String>()
     private val pendingImportIds = ArrayDeque<String>()
     private val pendingExportIds = ArrayDeque<String>()
+    private val pendingQrIds = ArrayDeque<String>()
     private val exportPayloads = HashMap<String, String>()
 
     private val pickModelLauncher: ActivityResultLauncher<Intent> =
@@ -63,6 +68,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContentView(webView)
         webView.addJavascriptInterface(bridge, "VirtuaNative")
+        handlePairIntent(intent)
         webView.loadUrl("file:///android_asset/public/index.html")
 
         onBackPressedDispatcher.addCallback(
@@ -78,6 +84,34 @@ class MainActivity : ComponentActivity() {
                 }
             },
         )
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handlePairIntent(intent)
+    }
+
+    @Suppress("OVERRIDE_DEPRECATION", "DEPRECATION")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        val result = IntentIntegrator.parseActivityResult(requestCode, resultCode, data) ?: return
+        val callbackId = pendingQrIds.removeFirstOrNull() ?: return
+        bridge.onQrScanned(callbackId, result.contents)
+    }
+
+    private fun handlePairIntent(intent: Intent?) {
+        val data = intent?.data ?: return
+        if (data.scheme?.lowercase() != "virtua" || data.host?.lowercase() != "pair") return
+        val host = data.getQueryParameter("host")?.trim().orEmpty()
+        val token = data.getQueryParameter("token")?.trim().orEmpty()
+        if (host.isBlank() || token.isBlank()) return
+        val port = data.getQueryParameter("port")?.toIntOrNull() ?: 8787
+        val json = JSONObject()
+            .put("url", "http://$host:$port")
+            .put("token", token)
+            .toString()
+        bridge.setPendingPair(json)
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -162,6 +196,21 @@ class MainActivity : ComponentActivity() {
             )
         }
         launchDocument(callbackId, pendingImportIds, importBundleLauncher, intent)
+    }
+
+    fun launchQrScanner(callbackId: String) {
+        pendingQrIds.addLast(callbackId)
+        val integrator = IntentIntegrator(this)
+        integrator.setDesiredBarcodeFormats(IntentIntegrator.QR_CODE)
+        integrator.setPrompt("Scan the pairing QR shown in Virtua on your PC")
+        integrator.setCameraId(0)
+        integrator.setBeepEnabled(false)
+        integrator.setBarcodeImageEnabled(false)
+        integrator.setOrientationLocked(true)
+        runCatching { integrator.initiateScan() }.onFailure { error ->
+            pendingQrIds.remove(callbackId)
+            bridge.postError(callbackId, error)
+        }
     }
 
     fun launchExport(callbackId: String, json: String) {

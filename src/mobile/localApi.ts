@@ -73,7 +73,8 @@ function bridgeStatus(): BridgeStatus {
     urls: [],
     running: false,
     desktopConnected: false,
-    phoneConnected: false
+    phoneConnected: false,
+    devices: []
   }
 }
 
@@ -404,6 +405,13 @@ export function createLocalApi(): { api: Window['api']; controller: LocalControl
       case 'bridge.setEnabled':
       case 'bridge.setBindLan':
         return bridgeStatus()
+      case 'bridge.pairQr':
+        throw new Error('The pairing QR is shown in the desktop Portable Sync panel.')
+      case 'bridge.devices':
+        return []
+      case 'bridge.revokeDevice':
+      case 'bridge.allowDevice':
+        throw new Error('Trusted devices are managed in the desktop Portable Sync panel.')
 
       case 'update.check':
         return updateInfo()

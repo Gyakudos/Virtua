@@ -4,6 +4,12 @@ type NativeResult<T> =
 
 interface VirtuaNativeBridge {
   call(method: string, argsJson: string, callbackId: string): void
+  consumePair?(): string | null
+}
+
+export interface PairIntent {
+  url: string
+  token: string
 }
 
 declare global {
@@ -30,6 +36,28 @@ window.__virtuaNativeCallback = (callbackId, result) => {
 
 export function nativeAvailable(): boolean {
   return typeof window.VirtuaNative?.call === 'function'
+}
+
+/** Read and clear a virtua://pair deep link delivered by the Android host. */
+export function consumePairIntent(): PairIntent | null {
+  const raw = window.VirtuaNative?.consumePair?.()
+  if (!raw) return null
+  try {
+    const parsed = JSON.parse(raw) as PairIntent
+    if (!parsed.url || !parsed.token) return null
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+export async function scanQrCode(): Promise<string> {
+  if (!nativeAvailable()) {
+    const pasted = window.prompt('Paste the pairing link from the desktop QR code:')
+    if (!pasted?.trim()) throw new Error('No pairing link entered.')
+    return pasted.trim()
+  }
+  return callNative<string>('scanQr')
 }
 
 export function callNative<T>(method: string, args: Record<string, unknown> = {}): Promise<T> {

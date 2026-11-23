@@ -25,6 +25,7 @@ import type {
   OcrResult,
   OllamaHealth,
   PendingApproval,
+  PairingQr,
   Persona,
   ScreenSourceInfo,
   BookmarkEntry,
@@ -43,6 +44,7 @@ import type {
   StreamHandlers,
   Task,
   ToolActivity,
+  TrustedDevice,
   ToolAuditEntry,
   VoiceConfig,
   VoiceStatus,
@@ -68,7 +70,13 @@ const api = {
     setEnabled: (enabled: boolean, bindLan?: boolean): Promise<BridgeStatus> =>
       ipcRenderer.invoke('bridge:setEnabled', enabled, bindLan),
     setBindLan: (bindLan: boolean): Promise<BridgeStatus> =>
-      ipcRenderer.invoke('bridge:setBindLan', bindLan)
+      ipcRenderer.invoke('bridge:setBindLan', bindLan),
+    pairQr: (): Promise<PairingQr> => ipcRenderer.invoke('bridge:pairQr'),
+    devices: (): Promise<TrustedDevice[]> => ipcRenderer.invoke('bridge:devices'),
+    revokeDevice: (id: string): Promise<BridgeStatus> =>
+      ipcRenderer.invoke('bridge:revokeDevice', id),
+    allowDevice: (id: string): Promise<BridgeStatus> =>
+      ipcRenderer.invoke('bridge:allowDevice', id)
   },
 
   health: (): Promise<OllamaHealth> => ipcRenderer.invoke('ollama:health'),

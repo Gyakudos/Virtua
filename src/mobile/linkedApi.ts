@@ -3,6 +3,14 @@ import { createApiProxy } from './apiContract'
 
 const URL_KEY = 'virtua.link.url'
 const TOKEN_KEY = 'virtua.link.token'
+const DEVICE_ID_KEY = 'virtua.device.id'
+const DEVICE_NAME_KEY = 'virtua.device.name'
+
+export interface DeviceIdentity {
+  id: string
+  name: string
+  platform: string
+}
 
 export type LinkStatus = 'unconfigured' | 'disconnected' | 'connecting' | 'connected' | 'error'
 
@@ -28,7 +36,7 @@ interface ActiveCall {
   handlers: Record<string, (value: unknown) => void>
 }
 
-function isLocalHost(host: string): boolean {
+export function isLocalHost(host: string): boolean {
   const lower = host.toLowerCase()
   if (lower === 'localhost' || lower === '::1' || lower.endsWith('.local') || lower.endsWith('.ts.net')) return true
   const octets = lower.split('.').map(Number)
@@ -62,6 +70,19 @@ function collectHandlers(args: unknown[]): Record<string, (value: unknown) => vo
   return handlers
 }
 
+export function deviceIdentity(): DeviceIdentity {
+  let id = localStorage.getItem(DEVICE_ID_KEY) ?? ''
+  if (!id) {
+    id = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `phone-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
+    localStorage.setItem(DEVICE_ID_KEY, id)
+  }
+  const storedName = localStorage.getItem(DEVICE_NAME_KEY)?.trim()
+  const name = storedName || (/Android/i.test(navigator.userAgent) ? 'Android phone' : 'Virtua phone')
+  return { id, name, platform: /Android/i.test(navigator.userAgent) ? 'Android' : 'Browser' }
+}
+
 function bridgeUrl(config: LinkConfig): string {
   const base = normalizeBaseUrl(config.url)
   const token = config.token.trim()
@@ -69,8 +90,12 @@ function bridgeUrl(config: LinkConfig): string {
   const url = new URL(base)
   url.pathname = '/bridge'
   url.search = ''
+  const identity = deviceIdentity()
   url.searchParams.set('role', 'phone')
   url.searchParams.set('token', token)
+  url.searchParams.set('deviceId', identity.id)
+  url.searchParams.set('deviceName', identity.name)
+  url.searchParams.set('platform', identity.platform)
   return url.toString()
 }
 

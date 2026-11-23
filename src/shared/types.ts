@@ -395,10 +395,27 @@ export interface BridgeConfig {
   urls: string[]
 }
 
+export interface TrustedDevice {
+  id: string
+  name: string
+  platform: string
+  pairedAt: number
+  lastSeenAt: number
+  revoked: boolean
+  connected: boolean
+}
+
 export interface BridgeStatus extends BridgeConfig {
   running: boolean
   desktopConnected: boolean
   phoneConnected: boolean
+  devices: TrustedDevice[]
+}
+
+export interface PairingQr {
+  dataUrl: string
+  payload: string
+  url: string
 }
 
 export interface UpdateInfo {

@@ -89,17 +89,20 @@ A strictly local-only desktop assistant. No cloud APIs, no telemetry, no runtime
 A local-first WebView app under `android/` reuses the same React UI through a Kotlin `window.api` adapter.
 
 - **Phone mode** runs on the phone hardware with no PC present. Import a GGUF model with **Mode & sync → Local model → Import GGUF**; inference uses the bundled `llama-android` runtime entirely on-device. Chats, personas, characters, settings, and imported VRM avatars stay in app-private storage.
-- **Desktop link mode** connects to the desktop bridge over your LAN, mDNS, or Tailscale only. Enter the desktop address (for example `http://192.168.1.20:8787`) and the pairing token shown in the desktop Data → system panel. No cloud relay or account is involved.
+- **Portable Sync:** open **Portable Sync** on the PC, click **Show pairing QR**, then open **Portable Sync → Scan PC QR** in the APK. The QR carries only your LAN address and the local pairing token; no cloud relay or account is involved. The PC panel also lists **Trusted Devices** so you can revoke or re-allow a phone. Manual address/token entry is still available under the same panel.
+- **Desktop link mode** connects to the desktop bridge over your LAN, mDNS, or Tailscale only. The APK stores a stable device ID so the paired phone appears in the PC's Trusted Devices list. No cloud relay or account is involved.
 - **Copy from desktop:** use **Export for Android…**, copy the resulting folder to the phone, then use **Import bundle** in the phone app. Referenced `.vrm` files are remapped to the phone copies. No VRM is bundled in the APK.
 - **Sync later:** with the bridge connected, **Pull from PC** pulls a versioned snapshot from the desktop; **Push to PC** replaces desktop data with the phone snapshot using the desktop app's transactional restore path.
 - Build web assets with `npm run build:android:assets`, then build the APK from `android/` with Gradle (`assembleDebug`). Android SDK, Java, and Gradle wrapper are used locally; no remote build service.
 
 ## Downloads
 
-The [latest GitHub release](https://github.com/Gyakudos/Virtua/releases/latest) contains smoke-test builds:
+The [pre-release `000.0015.000.2026`](https://github.com/Gyakudos/Virtua/releases/tag/000.0015.000.2026) contains smoke-test builds:
 
 - `Virtua-Setup-0.10.0-x64.exe` — Windows x64 setup. It is unsigned, so Windows SmartScreen may require **More info → Run anyway**.
-- `app-debug.apk` — Android arm64-v8a companion APK. No VRM or GGUF model is included; import your own files on the phone.
+- `app-debug.apk` — Android arm64-v8a companion APK with a local QR scanner. No VRM or GGUF model is included; import your own files on the phone.
+
+Because it is a pre-release, the desktop manual update check falls back to the version tag when GitHub's `/releases/latest` endpoint is empty.
 
 ## Setup
 

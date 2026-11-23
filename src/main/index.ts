@@ -6,7 +6,10 @@ import type {
   AgentMessage, AvatarConfig, ChatRequest, ConnectorKind, ConnectorRunRequest, ConversationKind, DevRunRequest,
   PendingApproval, Persona, Character, RagResult, VoiceConfig
 } from '../shared/types'
-import { bridgeConfig, bridgeStatus, setBridgeBindLan, setBridgeEnabled, startBridge, stopBridge } from './bridge'
+import {
+  allowDevice, bridgeConfig, bridgeStatus, pairingQr, revokeDevice, setBridgeBindLan,
+  setBridgeEnabled, startBridge, stopBridge
+} from './bridge'
 import { chatOnce, chatStream, getHealth } from './ollama'
 import { runAgent } from './agent'
 import * as avatar from './avatar'
@@ -399,6 +402,10 @@ function registerIpc(): void {
   ipcMain.handle('bridge:setEnabled', (_event, enabled: boolean, bindLan?: boolean) =>
     setBridgeEnabled(enabled, bindLan))
   ipcMain.handle('bridge:setBindLan', (_event, bindLan: boolean) => setBridgeBindLan(bindLan))
+  ipcMain.handle('bridge:pairQr', () => pairingQr())
+  ipcMain.handle('bridge:devices', () => bridgeStatus().devices)
+  ipcMain.handle('bridge:revokeDevice', (_event, id: string) => revokeDevice(id))
+  ipcMain.handle('bridge:allowDevice', (_event, id: string) => allowDevice(id))
 
   ipcMain.handle('system:shortcutStatus', () => polish.shortcutExists())
   ipcMain.handle('system:shortcutCreate', () => polish.createDesktopShortcut())

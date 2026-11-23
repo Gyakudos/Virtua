@@ -6,6 +6,7 @@ import type {
   BackupSummary,
   BridgeConfig,
   BridgeStatus,
+  PairingQr,
   UpdateInfo,
   AgentRequest,
   AvatarConfig,
@@ -41,6 +42,7 @@ import type {
   StreamHandlers,
   Task,
   ToolActivity,
+  TrustedDevice,
   ToolAuditEntry,
   VoiceConfig,
   VoiceStatus,
@@ -64,6 +66,10 @@ declare global {
         status(): Promise<BridgeStatus>
         setEnabled(enabled: boolean, bindLan?: boolean): Promise<BridgeStatus>
         setBindLan(bindLan: boolean): Promise<BridgeStatus>
+        pairQr(): Promise<PairingQr>
+        devices(): Promise<TrustedDevice[]>
+        revokeDevice(id: string): Promise<BridgeStatus>
+        allowDevice(id: string): Promise<BridgeStatus>
       }
       health(): Promise<OllamaHealth>
       chatOnce(request: ChatRequest): Promise<string>

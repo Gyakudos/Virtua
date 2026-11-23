@@ -3,6 +3,8 @@ import { createLinkedApi, readLinkConfig, type LinkConfig, type LinkStatus } fro
 import { createLocalApi, summarizePayload } from './localApi'
 import * as store from './localStore'
 import type { MobileControls, MobileMode } from './mobile'
+import { consumePairIntent, scanQrCode } from './native'
+import { parsePairLink } from './pairing'
 
 const MODE_KEY = 'virtua.mode'
 
@@ -16,9 +18,23 @@ function persistMode(mode: MobileMode): void {
 }
 
 export function installMobileApi(): { mode: MobileMode; controls: MobileControls } {
-  const query = new URLSearchParams(location.search).get('mode')
-  const mode: MobileMode = query === 'local' || query === 'linked' ? query : storedMode()
-  if (query === 'local' || query === 'linked') persistMode(mode)
+  const params = new URLSearchParams(location.search)
+  let paired = consumePairIntent()
+  if (!paired) {
+    const queryPair = params.get('pair')
+    if (queryPair) {
+      try { paired = parsePairLink(queryPair) } catch { paired = null }
+    }
+  }
+  if (paired) {
+    persistMode('linked')
+    localStorage.setItem('virtua.link.url', paired.url)
+    localStorage.setItem('virtua.link.token', paired.token)
+  }
+
+  const query = params.get('mode')
+  const mode: MobileMode = paired ? 'linked' : (query === 'local' || query === 'linked' ? query : storedMode())
+  if (!paired && (query === 'local' || query === 'linked')) persistMode(mode)
 
   const local = createLocalApi()
   const linked = createLinkedApi(mode === 'linked')
@@ -42,6 +58,10 @@ export function installMobileApi(): { mode: MobileMode; controls: MobileControls
       ? linked.controller.onStatus(listener)
       : () => undefined,
     linkConfig: () => mode === 'linked' ? linked.controller.config() : readLinkConfig(),
+    trustedDevices: () => window.api.bridge.devices(),
+    revokeDevice: async (id) => { await window.api.bridge.revokeDevice(id) },
+    allowDevice: async (id) => { await window.api.bridge.allowDevice(id) },
+    scanQr: () => scanQrCode(),
     setLink: (config: LinkConfig) => {
       if (mode === 'linked') {
         linked.controller.setConfig(config)

@@ -51,6 +51,21 @@ class VirtuaBridge(
     private var loadedPath: String? = null
     private val activeRequests = ConcurrentHashMap<String, Job>()
 
+    /** Set by MainActivity when a virtua://pair deep link is scanned or opened. */
+    @Volatile
+    private var pendingPair: String? = null
+
+    fun setPendingPair(json: String) {
+        pendingPair = json
+    }
+
+    @JavascriptInterface
+    fun consumePair(): String? {
+        val value = pendingPair
+        pendingPair = null
+        return value
+    }
+
     @JavascriptInterface
     fun call(method: String, argsJson: String, callbackId: String) {
         val parsedArgs = runCatching { JSONObject(argsJson.ifBlank { "{}" }) }
@@ -80,6 +95,7 @@ class VirtuaBridge(
             "complete" -> complete(args, callbackId)
             "cancel" -> cancel(args)
             "pickVrm" -> launchOnMain { activity.launchPickVrm(callbackId) }
+            "scanQr" -> launchOnMain { activity.launchQrScanner(callbackId) }
             "speak" -> speak(args.optString("text"))
             "importBundleFromSaf" -> launchOnMain { activity.launchImportBundle(callbackId) }
             "exportBundleToSaf" -> launchOnMain {
@@ -423,6 +439,14 @@ class VirtuaBridge(
     // ---------------------------------------------------------------------
     // Callback transport
     // ---------------------------------------------------------------------
+
+    fun onQrScanned(callbackId: String, contents: String?) {
+        if (contents.isNullOrBlank()) {
+            postError(callbackId, IllegalStateException("QR scan canceled."))
+        } else {
+            postOk(callbackId, contents)
+        }
+    }
 
     private fun postOk(callbackId: String, value: Any) {
         postResult(callbackId, JSONObject().put("ok", true).put("value", value))

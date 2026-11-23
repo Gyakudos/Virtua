@@ -10,6 +10,7 @@ import type {
   Conversation,
   Note,
   OllamaHealth,
+  PairingQr,
   PendingApproval,
   Persona,
   RagProgress,
@@ -23,6 +24,7 @@ import type {
   Task,
   ToolActivity,
   ToolAuditEntry,
+  TrustedDevice,
   UpdateInfo,
   VoiceConfig,
   VoiceStatus
@@ -92,6 +94,9 @@ export default function AssistantApp() {
   const [pendingApproval, setPendingApproval] = useState<PendingApproval | null>(null)
   const [toolActivity, setToolActivity] = useState<ToolActivity[]>([])
   const [showData, setShowData] = useState(false)
+  const [showSync, setShowSync] = useState(false)
+  const [pairQr, setPairQr] = useState<PairingQr | null>(null)
+  const [syncBusy, setSyncBusy] = useState(false)
   const [dataTab, setDataTab] = useState<'tasks' | 'notes' | 'reminders' | 'calendar' | 'voice' | 'audit' | 'system'>('tasks')
   const [notes, setNotes] = useState<Note[]>([])
   const [tasks, setTasks] = useState<Task[]>([])
@@ -140,6 +145,7 @@ export default function AssistantApp() {
   const [theme, setTheme] = useState<'dark' | 'light'>('dark')
   const [systemMessage, setSystemMessage] = useState('')
   const [bridge, setBridge] = useState<BridgeStatus | null>(null)
+  const [devices, setDevices] = useState<TrustedDevice[]>([])
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null)
   const [updateBusy, setUpdateBusy] = useState(false)
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([])
@@ -237,6 +243,7 @@ export default function AssistantApp() {
     setHotkeyName(hotkey)
     setTheme(currentTheme)
     setBridge(bridgeStatus)
+    setDevices(bridgeStatus.devices)
     document.body.classList.toggle('theme-light', currentTheme === 'light')
   }, [])
 
@@ -385,6 +392,32 @@ export default function AssistantApp() {
       const next = await window.api.bridge.setBindLan(!bridge.bindLan)
       setBridge(next)
       setSystemMessage(next.bindLan ? 'Bridge is listening on your local network.' : 'Bridge is loopback-only.')
+    } catch (cause) { systemError(cause) }
+  }
+
+  const showPairingQr = async (): Promise<void> => {
+    setSyncBusy(true)
+    try {
+      if (!bridge?.enabled || !bridge.bindLan) {
+        const next = await window.api.bridge.setEnabled(true, true)
+        setBridge(next)
+        setDevices(next.devices)
+      }
+      setPairQr(await window.api.bridge.pairQr())
+      setSystemMessage('Pairing QR ready. Scan it in the Android app’s Portable Sync tab.')
+    } catch (cause) { systemError(cause) } finally {
+      setSyncBusy(false)
+    }
+  }
+
+  const setDeviceTrust = async (id: string, trusted: boolean): Promise<void> => {
+    try {
+      const next = trusted
+        ? await window.api.bridge.allowDevice(id)
+        : await window.api.bridge.revokeDevice(id)
+      setBridge(next)
+      setDevices(next.devices)
+      setSystemMessage(trusted ? 'Device allowed again.' : 'Device revoked.')
     } catch (cause) { systemError(cause) }
   }
 
@@ -1129,6 +1162,7 @@ export default function AssistantApp() {
           <button type="button" className="small" onClick={() => setShowDev((value) => !value)}>Dev</button>
           <button type="button" className="small" onClick={() => setShowKnowledge((value) => !value)}>Knowledge</button>
           <button type="button" className="small" onClick={() => setShowData((value) => !value)}>Data</button>
+          <button type="button" className="small primary" onClick={() => setShowSync((value) => !value)}>Portable Sync</button>
           <button type="button" className="small" onClick={() => void exportChat()}>Export</button>
           <button type="button" className="small" onClick={() => { setShowData(true); setDataTab('calendar') }}>Calendar</button>
           <button type="button" className="small" onClick={() => { setShowData(true); setDataTab('voice') }}>Voice</button>
@@ -1241,6 +1275,81 @@ export default function AssistantApp() {
                 [{index + 1}] {result.title} · {result.score}
               </span>
             ))}
+          </div>
+        )}
+
+        {showSync && (
+          <div className="data-drawer sync-drawer">
+            <div className="data-tabs">
+              <strong>Portable Sync</strong>
+              <small className="muted">local LAN bridge · opt-in only</small>
+              <span className="spacer" />
+              <button type="button" className="small" onClick={() => void loadSystem()}>Refresh</button>
+              <button type="button" className="icon" onClick={() => setShowSync(false)}>×</button>
+            </div>
+            <div className="data-body sync-body">
+              <div className="sync-grid">
+                <div className="sync-qr">
+                  {pairQr
+                    ? <img src={pairQr.dataUrl} alt="Portable Sync pairing QR" />
+                    : <div className="qr-placeholder">QR not generated</div>}
+                  <small>Scan in the Android app: <strong>Portable Sync → Scan PC QR</strong>.</small>
+                </div>
+                <div className="sync-info">
+                  <div className="data-row">
+                    <div>
+                      <strong>Local bridge</strong>
+                      <small>
+                        {bridge?.enabled
+                          ? `${bridge.running ? 'Listening' : 'Stopped'} · ${bridge.bindLan ? 'LAN on' : 'loopback only'} · token ${bridge.token}`
+                          : 'Off — no phone can reach this PC'}
+                        {pairQr && <><br />Address <code>{pairQr.url}</code></>}
+                      </small>
+                    </div>
+                    <div className="row-actions">
+                      <button type="button" className="small" onClick={() => void toggleBridge()}>
+                        {bridge?.enabled ? 'Disable' : 'Enable'}
+                      </button>
+                      <button type="button" className="small" disabled={!bridge?.enabled} onClick={() => void toggleBridgeLan()}>
+                        {bridge?.bindLan ? 'LAN on' : 'LAN off'}
+                      </button>
+                      <button type="button" className="small primary" disabled={syncBusy} onClick={() => void showPairingQr()}>
+                        {syncBusy ? 'Preparing…' : 'Show pairing QR'}
+                      </button>
+                    </div>
+                  </div>
+                  <small className="muted">The QR contains only your LAN address and the local pairing token. No cloud service is involved.</small>
+                </div>
+              </div>
+
+              <div className="sync-devices">
+                <strong>Trusted Devices</strong>
+                {devices.length === 0
+                  ? <small className="muted">No phone has paired yet. Scan the QR above to add one.</small>
+                  : devices.map((device) => (
+                    <div key={device.id} className="data-row device-row">
+                      <div>
+                        <strong>{device.name}</strong>
+                        <small>
+                          {device.platform} · {device.connected ? 'connected now' : `last seen ${new Date(device.lastSeenAt).toLocaleString()}`}
+                          {' · '}{device.revoked ? 'revoked' : 'trusted'}
+                        </small>
+                        <code>{device.id.slice(0, 16)}…</code>
+                      </div>
+                      <div className="row-actions">
+                        <button
+                          type="button"
+                          className={device.revoked ? 'small primary' : 'small danger'}
+                          onClick={() => void setDeviceTrust(device.id, device.revoked)}
+                        >
+                          {device.revoked ? 'Allow again' : 'Revoke'}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+              {systemMessage && <div className="banner">{systemMessage}</div>}
+            </div>
           </div>
         )}
 

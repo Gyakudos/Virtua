@@ -4,6 +4,9 @@
     <!-- Optional opt-in LAN/Tailscale WebSocket bridge. No remote services are contacted by default. -->
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- Local QR scanner for Portable Sync pairing. No image or barcode leaves the device. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+
     <!-- SAF does not normally require storage permissions; this only helps on older devices. -->
     <uses-permission
         android:name="android.permission.READ_EXTERNAL_STORAGE"
@@ -29,6 +32,14 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!-- QR codes from the desktop encode virtua://pair?host=...&port=...&token=... -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="virtua" android:host="pair" />
             </intent-filter>
         </activity>
     </application>
