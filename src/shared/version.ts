@@ -1,12 +1,11 @@
-// Custom build version: Major.Minor.Day.Month.Year
-// 0 . 010 . 19 . 11 . 26  ->  19 Nov 2026
-export const BUILD_VERSION = '0.010.19.11.26'
+// Release version uses the GitHub tag format: Major.Minor.Sub.Year
+// 000 . 015 . 004 . 2026
+export const BUILD_VERSION = '000.015.004.2026'
 
 export const VERSION_INFO = {
   major: 0,
-  minor: 10,
-  day: 19,
-  month: 11,
+  minor: 15,
+  sub: 4,
   year: 2026,
   label: BUILD_VERSION
 } as const

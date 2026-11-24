@@ -422,8 +422,11 @@ export default function AssistantApp() {
       if (!bridge?.phoneConnected) throw new Error('No phone is connected. Pair and connect a phone first.')
       const payload = await window.api.sync.pull()
       const summary = await callPeer('port.receive', [payload]) as BackupSummary
+      const modelIssue = summary.modelErrors?.length
+        ? ` Model issue: ${summary.modelErrors[0]}${summary.modelErrors.length > 1 ? ` (+${summary.modelErrors.length - 1} more)` : ''}`
+        : ''
       setSystemMessage(
-        `Ported to phone: ${summary.conversations} chats, ${summary.messages} messages, ${summary.avatars ?? 0} avatars, ${summary.models ?? 0} models.`
+        `Ported to phone: ${summary.conversations} chats, ${summary.messages} messages, ${summary.avatars ?? 0} avatars, ${summary.models ?? 0} models.${modelIssue}`
       )
     } catch (cause) { systemError(cause) } finally {
       setSyncBusy(false)

@@ -25,8 +25,8 @@ android {
         applicationId = "com.virtua.nativeandroid"
         minSdk = 24
         targetSdk = 36
-        versionCode = 15003
-        versionName = "000.015.003.2026"
+        versionCode = 15004
+        versionName = "000.015.004.2026"
 
         ndk {
             // llama-android 0.1.1 ships arm64-v8a native libraries only.

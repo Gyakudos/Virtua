@@ -183,20 +183,37 @@ interface ModelTransferBegin {
   skipped: boolean
 }
 
+interface ModelImportResult {
+  imported: ImportedModel[]
+  errors: string[]
+}
+
+const MODEL_CHUNK_BYTES = 1024 * 1024
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
+}
+
 /** Stream Ollama GGUF files from the PC bridge into app-private phone storage. */
-async function importModelFiles(payload: BackupPayload): Promise<ImportedModel[]> {
+async function importModelFiles(payload: BackupPayload): Promise<ModelImportResult> {
+  const imported: ImportedModel[] = []
+  const errors: string[] = []
   const files = payload.modelFiles ?? []
-  if (files.length === 0) return []
+  if (files.length === 0) return { imported, errors }
+
   const link = readLinkConfig()
-  if (!link.url || !link.token || !nativeAvailable()) {
-    console.warn('[mobile] model metadata found without an active local bridge; skipping GGUF transfer.')
-    return []
+  if (!nativeAvailable() || !link.url || !link.token) {
+    const reason = !nativeAvailable()
+      ? 'Android native bridge is unavailable'
+      : 'No active desktop link is configured'
+    errors.push(`${reason}; cannot import ${files.length} model(s)`)
+    return { imported, errors }
   }
 
   const origin = link.url.trim().replace(/\/+$/, '')
     .replace(/^ws:/, 'http:')
     .replace(/^wss:/, 'https:')
-  const imported: ImportedModel[] = []
+
   for (const file of files) {
     let tempPath = ''
     try {
@@ -204,7 +221,9 @@ async function importModelFiles(payload: BackupPayload): Promise<ImportedModel[]
         `${origin}/model?name=${encodeURIComponent(file.name)}&token=${encodeURIComponent(link.token)}`,
         { cache: 'no-store' }
       )
-      if (!response.ok) throw new Error(`HTTP ${response.status}`)
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}${response.statusText ? ` ${response.statusText}` : ''}`)
+      }
       const size = Number(response.headers.get('content-length') ?? file.size) || file.size
       if (!response.body) throw new Error('The PC returned no model data.')
 
@@ -217,13 +236,29 @@ async function importModelFiles(payload: BackupPayload): Promise<ImportedModel[]
         continue
       }
       tempPath = begin.tempPath ?? ''
+      if (!tempPath) throw new Error('The phone did not return a temporary download path.')
+
+      // Buffer small network reads into ~1 MB writes so multi-GB models need far fewer bridge calls.
+      let pending = new Uint8Array(0)
+      const flush = async (): Promise<void> => {
+        if (pending.length === 0) return
+        await callNative('writeModelChunk', { tempPath, dataBase64: bytesToBase64(pending) })
+        pending = new Uint8Array(0)
+      }
 
       const reader = response.body.getReader()
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
-        await callNative('writeModelChunk', { tempPath, dataBase64: bytesToBase64(value) })
+        if (!value?.length) continue
+        const merged = new Uint8Array(pending.length + value.length)
+        merged.set(pending, 0)
+        merged.set(value, pending.length)
+        pending = merged
+        if (pending.length >= MODEL_CHUNK_BYTES) await flush()
       }
+      await flush()
+
       const saved = await callNative<NativeModel>('finishModel', {
         tempPath,
         targetPath: begin.path,
@@ -232,13 +267,13 @@ async function importModelFiles(payload: BackupPayload): Promise<ImportedModel[]
       tempPath = ''
       imported.push({ name: file.name, fileName: saved.name, path: saved.path, size: saved.size ?? size })
     } catch (error) {
-      if (tempPath) {
-        await callNative('cancelModel', { tempPath }).catch(() => undefined)
-      }
+      if (tempPath) await callNative('cancelModel', { tempPath }).catch(() => undefined)
+      const detail = errorMessage(error)
+      errors.push(`${file.name}: ${detail}`)
       console.warn(`[mobile] could not import model ${file.name}:`, error)
     }
   }
-  return imported
+  return { imported, errors }
 }
 
 /** Import a snapshot that may contain avatar bytes (local bridge pull or phone port.receive). */
@@ -246,13 +281,17 @@ export async function importPayloadWithAvatars(payload: BackupPayload): Promise<
   if (!payload || typeof payload !== 'object' || !Array.isArray(payload.conversations)) {
     throw new Error('Invalid backup payload.')
   }
-  const [importedAvatars, importedModels] = await Promise.all([
+  const [importedAvatars, modelResult] = await Promise.all([
     importAvatarFiles(payload),
     importModelFiles(payload)
   ])
   const next = remapAvatars(payload, importedAvatars)
   store.importBundle(next)
-  return { ...summarizePayload(next), models: importedModels.length }
+  return {
+    ...summarizePayload(next),
+    models: modelResult.imported.length,
+    modelErrors: modelResult.errors
+  }
 }
 
 function silentWav(): Uint8Array {

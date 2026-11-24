@@ -389,6 +389,8 @@ export interface BackupSummary {
   settings: number
   avatars: number
   models?: number
+  /** Non-fatal GGUF transfer failures, surfaced in the sync message. */
+  modelErrors?: string[]
 }
 
 export interface BridgeConfig {

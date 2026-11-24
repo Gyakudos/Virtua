@@ -1,7 +1,6 @@
-import { existsSync, readFileSync, statSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { join, resolve, sep } from 'node:path'
-import { getHealth } from './ollama'
+import { join, relative, resolve, sep } from 'node:path'
 
 const DEFAULT_ROOT = join(homedir(), '.ollama', 'models')
 const MODEL_LAYER = 'application/vnd.ollama.image.model'
@@ -30,8 +29,9 @@ function isSegment(value: string): boolean {
 function manifestFor(name: string): string | null {
   const raw = name.trim()
   if (!raw || raw.includes('\\') || raw.includes('..')) return null
-  const colon = raw.indexOf(':')
-  if (colon < 0 || colon !== raw.lastIndexOf(':')) return null
+  // Use the colon after the last slash so registry hosts with ports (localhost:5000/...) work.
+  const colon = raw.lastIndexOf(':')
+  if (colon < 0 || colon < raw.lastIndexOf('/')) return null
   const modelPart = raw.slice(0, colon)
   const tag = raw.slice(colon + 1)
   if (!isSegment(tag)) return null
@@ -87,14 +87,42 @@ export function resolveOllamaModel(name: string): OllamaModelFile | null {
   }
 }
 
-/** All installed Ollama models that can be copied to the phone as GGUF files. */
+function walkManifests(dir: string, found: string[], depth = 0): void {
+  if (depth > 8 || found.length >= 500 || !existsSync(dir)) return
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const path = join(dir, entry.name)
+    if (entry.isDirectory()) walkManifests(path, found, depth + 1)
+    else if (entry.isFile()) found.push(path)
+  }
+}
+
+/** Rebuild the Ollama model name from a manifest path under the manifests root. */
+function nameFromManifest(manifestRoot: string, manifestPath: string): string | null {
+  const parts = relative(manifestRoot, manifestPath).split(/[\\/]/).filter(Boolean)
+  if (parts.length < 3) return null
+  parts.shift() // registry host
+  if (parts[0] === 'library') parts.shift()
+  if (parts.length < 2) return null
+  const tag = parts.pop()
+  if (!tag || !parts.every(isSegment) || !isSegment(tag)) return null
+  return `${parts.join('/')}:${tag}`
+}
+
+/**
+ * All installed Ollama models that can be copied to the phone as GGUF files.
+ * Reads manifests directly so sync still works when the Ollama daemon is stopped.
+ */
 export async function listOllamaModelFiles(): Promise<OllamaModelFile[]> {
-  const health = await getHealth()
-  if (health.status !== 'online') return []
+  const manifestRoot = resolve(modelsRoot(), 'manifests')
+  const manifestPaths: string[] = []
+  walkManifests(manifestRoot, manifestPaths)
+
   const files: OllamaModelFile[] = []
   const seen = new Set<string>()
-  for (const model of health.models) {
-    const file = resolveOllamaModel(model.name)
+  for (const manifestPath of manifestPaths) {
+    const name = nameFromManifest(manifestRoot, manifestPath)
+    if (!name) continue
+    const file = resolveOllamaModel(name)
     if (!file || seen.has(file.digest)) continue
     seen.add(file.digest)
     files.push(file)
