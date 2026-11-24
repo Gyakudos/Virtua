@@ -120,13 +120,13 @@ export function installMobileApi(): { mode: MobileMode; controls: MobileControls
       const payload = await linked.api.sync.pull() as BackupPayload
       return { models: payload.modelFiles ?? [], discovery: payload.modelDiscovery }
     },
-    downloadPcModel: async (name) => {
+    downloadPcModel: async (name, onProgress) => {
       const payload = await linked.api.sync.pull() as BackupPayload
       const files = (payload.modelFiles ?? []).filter((file) => file.name === name)
       if (files.length === 0) {
         return { downloaded: 0, skipped: 0, errors: [`Model ${name} is no longer available on the PC.`] }
       }
-      return await downloadPcModels(files)
+      return await downloadPcModels(files, onProgress)
     }
   }
 

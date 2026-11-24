@@ -46,6 +46,12 @@ export default function MobileHost({ mode, controls }: Props) {
     }
   }
 
+  useEffect(() => {
+    const refresh = (): void => { void listModels() }
+    window.addEventListener('virtua-models-changed', refresh)
+    return () => window.removeEventListener('virtua-models-changed', refresh)
+  }, [controls])
+
   const importModel = async (): Promise<void> => {
     try {
       await controls.pickModel()

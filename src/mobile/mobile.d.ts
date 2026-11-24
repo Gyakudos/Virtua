@@ -32,7 +32,7 @@ export interface MobileControls {
   pull(): Promise<BackupSummary>
   push(): Promise<void>
   listPcModels(): Promise<PcModelCatalog>
-  downloadPcModel(name: string): Promise<ModelDownloadResult>
+  downloadPcModel(name: string, onProgress?: (percent: number) => void): Promise<ModelDownloadResult>
 }
 
 declare global {

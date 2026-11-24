@@ -15,6 +15,7 @@ export default function MobileSync({ controls, status }: Props) {
   const [pcModels, setPcModels] = useState<PcModelCatalog | null>(null)
   const [selectedModel, setSelectedModel] = useState('')
   const [message, setMessage] = useState('')
+  const [downloadProgress, setDownloadProgress] = useState<number | null>(null)
   const [syncBusy, setSyncBusy] = useState(false)
 
   useEffect(() => {
@@ -109,13 +110,26 @@ export default function MobileSync({ controls, status }: Props) {
       return
     }
     setSyncBusy(true)
+    setDownloadProgress(0)
+    setMessage(`Downloading ${selectedModel}… 0%`)
     try {
-      const result = await controls.downloadPcModel(selectedModel)
+      const result = await controls.downloadPcModel(selectedModel, (percent) => {
+        setDownloadProgress(percent)
+        setMessage(`Downloading ${selectedModel}… ${percent}%`)
+      })
+      const phoneModels = await controls.models()
+      const names = phoneModels.map((model) => model.name)
+      const phoneText = names.length
+        ? ` Phone models: ${names.length} [${names.join(', ')}].`
+        : ' Phone models: 0 — the download finished but the phone did not register a GGUF file.'
       const errorText = result.errors.length ? ` ${result.errors[0]}` : ''
-      setMessage(`Model download: ${result.downloaded} downloaded, ${result.skipped} already present.${errorText}`)
+      setMessage(
+        `Model download: ${result.downloaded} downloaded, ${result.skipped} already present.${phoneText}${errorText}`
+      )
     } catch (error) {
       report(error)
     } finally {
+      setDownloadProgress(null)
       setSyncBusy(false)
     }
   }
@@ -263,6 +277,9 @@ export default function MobileSync({ controls, status }: Props) {
         ))}
       </section>
 
+      {downloadProgress !== null && (
+        <progress className="sync-progress" value={downloadProgress} max={100} />
+      )}
       {message && <div className="sync-message" role="status">{message}</div>}
     </div>
   )

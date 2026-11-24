@@ -196,12 +196,31 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
+/** Let the chat and setup screens refresh as soon as a model lands in app-private storage. */
+function notifyModelsChanged(): void {
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event('virtua-models-changed'))
+}
+
 /** Stream Ollama GGUF files from the PC bridge into app-private phone storage. */
-async function importModelFiles(files: NonNullable<BackupPayload['modelFiles']>): Promise<ModelImportResult> {
+async function importModelFiles(
+  files: NonNullable<BackupPayload['modelFiles']>,
+  onProgress?: (percent: number) => void
+): Promise<ModelImportResult> {
   const imported: ImportedModel[] = []
   const errors: string[] = []
   let skipped = 0
   if (files.length === 0) return { imported, skipped, errors }
+
+  const totalBytes = files.reduce((sum, file) => sum + Math.max(1, file.size), 0)
+  let receivedBytes = 0
+  let lastPercent = -1
+  const report = (): void => {
+    const percent = Math.min(100, Math.floor((receivedBytes / totalBytes) * 100))
+    if (percent !== lastPercent) {
+      lastPercent = percent
+      onProgress?.(percent)
+    }
+  }
 
   const link = readLinkConfig()
   if (!nativeAvailable() || !link.url || !link.token) {
@@ -235,6 +254,8 @@ async function importModelFiles(files: NonNullable<BackupPayload['modelFiles']>)
       })
       if (begin.skipped) {
         skipped += 1
+        receivedBytes += Math.max(1, file.size)
+        report()
         imported.push({ name: file.name, fileName: begin.name, path: begin.path, size: begin.size })
         continue
       }
@@ -254,6 +275,8 @@ async function importModelFiles(files: NonNullable<BackupPayload['modelFiles']>)
         const { done, value } = await reader.read()
         if (done) break
         if (!value?.length) continue
+        receivedBytes += value.length
+        report()
         const merged = new Uint8Array(pending.length + value.length)
         merged.set(pending, 0)
         merged.set(value, pending.length)
@@ -276,12 +299,16 @@ async function importModelFiles(files: NonNullable<BackupPayload['modelFiles']>)
       console.warn(`[mobile] could not import model ${file.name}:`, error)
     }
   }
+  notifyModelsChanged()
   return { imported, skipped, errors }
 }
 
 /** Dedicated phone action: download one or more PC models without importing the rest of the snapshot. */
-export async function downloadPcModels(files: NonNullable<BackupPayload['modelFiles']>): Promise<import('../shared/types').ModelDownloadResult> {
-  const result = await importModelFiles(files)
+export async function downloadPcModels(
+  files: NonNullable<BackupPayload['modelFiles']>,
+  onProgress?: (percent: number) => void
+): Promise<import('../shared/types').ModelDownloadResult> {
+  const result = await importModelFiles(files, onProgress)
   return {
     downloaded: result.imported.length - result.skipped,
     skipped: result.skipped,

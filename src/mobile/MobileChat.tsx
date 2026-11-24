@@ -167,6 +167,12 @@ export default function MobileChat({ kind, controls, mode }: Props) {
   useEffect(() => { void refresh() }, [refresh])
 
   useEffect(() => {
+    const refreshModels = (): void => { void refresh() }
+    window.addEventListener('virtua-models-changed', refreshModels)
+    return () => window.removeEventListener('virtua-models-changed', refreshModels)
+  }, [refresh])
+
+  useEffect(() => {
     if (!activeId) {
       setMessages([])
       return
