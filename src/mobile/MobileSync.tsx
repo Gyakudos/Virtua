@@ -254,6 +254,12 @@ export default function MobileSync({ controls, status }: Props) {
         ) : (
           <p className="sync-hint">No PC models listed yet. Tap <strong>List models on PC</strong>.</p>
         )}
+        {downloadProgress !== null && (
+          <div className="download-progress" role="status">
+            <progress value={downloadProgress} max={100} />
+            <span>Downloading {selectedModel}… {downloadProgress}%</span>
+          </div>
+        )}
       </section>
 
       <section className="sync-card">
@@ -277,9 +283,6 @@ export default function MobileSync({ controls, status }: Props) {
         ))}
       </section>
 
-      {downloadProgress !== null && (
-        <progress className="sync-progress" value={downloadProgress} max={100} />
-      )}
       {message && <div className="sync-message" role="status">{message}</div>}
     </div>
   )

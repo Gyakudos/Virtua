@@ -898,9 +898,17 @@ button:disabled {
   font-size: 14px;
 }
 
-.sync-progress {
+.download-progress {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+  color: #bff3d1;
+  font-size: 13px;
+}
+
+.download-progress progress {
   width: 100%;
-  height: 12px;
+  height: 14px;
   accent-color: #4fbf7a;
 }
 
