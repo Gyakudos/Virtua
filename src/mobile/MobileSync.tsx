@@ -57,7 +57,9 @@ export default function MobileSync({ controls, status }: Props) {
   const syncPull = async (): Promise<void> => {
     try {
       const summary = await controls.pull()
-      setMessage(`Imported ${summary.conversations} chats and ${summary.messages} messages.`)
+      setMessage(
+        `Imported ${summary.conversations} chats, ${summary.messages} messages, ${summary.avatars ?? 0} avatars, ${summary.models ?? 0} models.`
+      )
     } catch (error) {
       report(error)
     }

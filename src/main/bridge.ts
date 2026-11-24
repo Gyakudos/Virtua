@@ -1,10 +1,12 @@
 import { randomBytes } from 'node:crypto'
+import { createReadStream } from 'node:fs'
 import { createServer, type Server } from 'node:http'
 import { networkInterfaces } from 'node:os'
 import QRCode from 'qrcode'
 import { WebSocket, WebSocketServer } from 'ws'
 import type { BridgeConfig, BridgeStatus, PairingQr, TrustedDevice } from '../shared/types'
 import { BUILD_VERSION } from '../shared/version'
+import { resolveOllamaModel } from './ollamaModels'
 import * as store from './storage'
 
 type Role = 'desktop' | 'phone'
@@ -241,6 +243,33 @@ export function startBridge(): BridgeStatus {
         'Access-Control-Allow-Origin': '*'
       })
       response.end(JSON.stringify({ ok: token === pairingToken() }))
+      return
+    }
+    // Streams an installed Ollama GGUF blob to the phone during opt-in local sync.
+    // Large models must not be embedded in the WebSocket JSON payload.
+    if (path === '/model') {
+      const params = new URL(request.url ?? '/', 'http://localhost').searchParams
+      const token = params.get('token')
+      if (token !== pairingToken()) {
+        response.writeHead(401, { 'Content-Type': 'text/plain; charset=utf-8' })
+        response.end('Unauthorized')
+        return
+      }
+      const model = resolveOllamaModel(params.get('name') ?? '')
+      if (!model) {
+        response.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' })
+        response.end('Model not found on this PC.')
+        return
+      }
+      response.writeHead(200, {
+        'Content-Type': 'application/octet-stream',
+        'Content-Length': String(model.size),
+        'Content-Disposition': `attachment; filename="${model.fileName}"`,
+        'Access-Control-Allow-Origin': '*'
+      })
+      const stream = createReadStream(model.sourcePath)
+      stream.on('error', () => response.destroy())
+      stream.pipe(response)
       return
     }
     response.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' })

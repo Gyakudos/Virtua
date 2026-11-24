@@ -5,7 +5,8 @@ import type {
 } from '../shared/types'
 import { BUILD_VERSION } from '../shared/version'
 import { createApiProxy } from './apiContract'
-import { bytesFromBase64, callNative, nativeAvailable } from './native'
+import { readLinkConfig } from './linkedApi'
+import { bytesFromBase64, bytesToBase64, callNative, nativeAvailable } from './native'
 import * as store from './localStore'
 
 export interface NativeModel {
@@ -24,6 +25,13 @@ interface ImportedAvatar {
   fileName: string
   path: string
   dataBase64?: string
+}
+
+interface ImportedModel {
+  name: string
+  fileName: string
+  path: string
+  size: number
 }
 
 const vrmCache = new Map<string, VrmFileInfo>()
@@ -108,7 +116,8 @@ export function summarizePayload(payload: BackupPayload): BackupSummary {
     reminders: payload.reminders.length,
     calendarEvents: payload.calendarEvents.length,
     settings: payload.settings.length,
-    avatars: payload.avatars?.length ?? 0
+    avatars: payload.avatars?.length ?? 0,
+    models: payload.modelFiles?.length ?? 0
   }
 }
 
@@ -166,15 +175,84 @@ async function importAvatarFiles(payload: BackupPayload): Promise<ImportedAvatar
   return imported
 }
 
+interface ModelTransferBegin {
+  name: string
+  path: string
+  tempPath?: string
+  size: number
+  skipped: boolean
+}
+
+/** Stream Ollama GGUF files from the PC bridge into app-private phone storage. */
+async function importModelFiles(payload: BackupPayload): Promise<ImportedModel[]> {
+  const files = payload.modelFiles ?? []
+  if (files.length === 0) return []
+  const link = readLinkConfig()
+  if (!link.url || !link.token || !nativeAvailable()) {
+    console.warn('[mobile] model metadata found without an active local bridge; skipping GGUF transfer.')
+    return []
+  }
+
+  const origin = link.url.trim().replace(/\/+$/, '')
+    .replace(/^ws:/, 'http:')
+    .replace(/^wss:/, 'https:')
+  const imported: ImportedModel[] = []
+  for (const file of files) {
+    let tempPath = ''
+    try {
+      const response = await fetch(
+        `${origin}/model?name=${encodeURIComponent(file.name)}&token=${encodeURIComponent(link.token)}`,
+        { cache: 'no-store' }
+      )
+      if (!response.ok) throw new Error(`HTTP ${response.status}`)
+      const size = Number(response.headers.get('content-length') ?? file.size) || file.size
+      if (!response.body) throw new Error('The PC returned no model data.')
+
+      const begin = await callNative<ModelTransferBegin>('beginModel', {
+        fileName: file.fileName,
+        size
+      })
+      if (begin.skipped) {
+        imported.push({ name: file.name, fileName: begin.name, path: begin.path, size: begin.size })
+        continue
+      }
+      tempPath = begin.tempPath ?? ''
+
+      const reader = response.body.getReader()
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        await callNative('writeModelChunk', { tempPath, dataBase64: bytesToBase64(value) })
+      }
+      const saved = await callNative<NativeModel>('finishModel', {
+        tempPath,
+        targetPath: begin.path,
+        size
+      })
+      tempPath = ''
+      imported.push({ name: file.name, fileName: saved.name, path: saved.path, size: saved.size ?? size })
+    } catch (error) {
+      if (tempPath) {
+        await callNative('cancelModel', { tempPath }).catch(() => undefined)
+      }
+      console.warn(`[mobile] could not import model ${file.name}:`, error)
+    }
+  }
+  return imported
+}
+
 /** Import a snapshot that may contain avatar bytes (local bridge pull or phone port.receive). */
 export async function importPayloadWithAvatars(payload: BackupPayload): Promise<BackupSummary> {
   if (!payload || typeof payload !== 'object' || !Array.isArray(payload.conversations)) {
     throw new Error('Invalid backup payload.')
   }
-  const imported = await importAvatarFiles(payload)
-  const next = remapAvatars(payload, imported)
+  const [importedAvatars, importedModels] = await Promise.all([
+    importAvatarFiles(payload),
+    importModelFiles(payload)
+  ])
+  const next = remapAvatars(payload, importedAvatars)
   store.importBundle(next)
-  return summarizePayload(next)
+  return { ...summarizePayload(next), models: importedModels.length }
 }
 
 function silentWav(): Uint8Array {
@@ -205,6 +283,10 @@ export interface LocalController {
   pickModel(): Promise<NativeModel>
   avatars(): Promise<NativeAvatar[]>
   saveAvatar(fileName: string, dataBase64: string): Promise<NativeAvatar>
+  beginModel(fileName: string, size: number): Promise<ModelTransferBegin>
+  writeModelChunk(tempPath: string, dataBase64: string): Promise<void>
+  finishModel(tempPath: string, targetPath: string, size: number): Promise<NativeModel>
+  cancelModel(tempPath: string): Promise<void>
   importBundle(): Promise<BackupSummary>
   exportBundle(): Promise<void>
 }
@@ -531,6 +613,15 @@ export function createLocalApi(): { api: Window['api']; controller: LocalControl
         data: bytesFromBase64(dataBase64)
       })
       return saved
+    },
+    beginModel: (fileName, size) => callNative<ModelTransferBegin>('beginModel', { fileName, size }),
+    writeModelChunk: async (tempPath, dataBase64) => {
+      await callNative('writeModelChunk', { tempPath, dataBase64 })
+    },
+    finishModel: (tempPath, targetPath, size) =>
+      callNative<NativeModel>('finishModel', { tempPath, targetPath, size }),
+    cancelModel: async (tempPath) => {
+      await callNative('cancelModel', { tempPath })
     },
     importBundle,
     exportBundle

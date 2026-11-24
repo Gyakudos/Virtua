@@ -6,6 +6,7 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSyn
 import { basename, dirname, extname, join } from 'node:path'
 import type { BackupPayload, BackupSummary } from '../shared/types'
 import { BUILD_VERSION } from '../shared/version'
+import { listOllamaModelFiles } from './ollamaModels'
 import { isCredentialPath } from './rag'
 import * as store from './storage'
 
@@ -179,11 +180,17 @@ function collectAvatarAssets(payload: BackupPayload): AvatarAssets {
   return { avatars, avatarFiles }
 }
 
-/** Snapshot used by the local phone bridge; includes real VRM bytes, not just paths. */
-export function buildMobilePullPayload(): BackupPayload {
+/** Snapshot used by the local phone bridge; VRM bytes are embedded and GGUF bytes stream on demand. */
+export async function buildMobilePullPayload(): Promise<BackupPayload> {
   const payload = store.buildBackupPayload(BUILD_VERSION)
   const assets = collectAvatarAssets(payload)
-  return { ...payload, avatars: assets.avatars, avatarFiles: assets.avatarFiles }
+  const models = await listOllamaModelFiles()
+  return {
+    ...payload,
+    avatars: assets.avatars,
+    avatarFiles: assets.avatarFiles,
+    modelFiles: models.map(({ name, fileName, digest, size }) => ({ name, fileName, digest, size }))
+  }
 }
 
 /** Export a versioned JSON snapshot plus the actual .vrm files for Android import. */

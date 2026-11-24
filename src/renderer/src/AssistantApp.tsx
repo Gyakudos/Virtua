@@ -423,7 +423,7 @@ export default function AssistantApp() {
       const payload = await window.api.sync.pull()
       const summary = await callPeer('port.receive', [payload]) as BackupSummary
       setSystemMessage(
-        `Ported to phone: ${summary.conversations} chats, ${summary.messages} messages, ${summary.avatars ?? 0} avatars.`
+        `Ported to phone: ${summary.conversations} chats, ${summary.messages} messages, ${summary.avatars ?? 0} avatars, ${summary.models ?? 0} models.`
       )
     } catch (cause) { systemError(cause) } finally {
       setSyncBusy(false)

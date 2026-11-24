@@ -373,6 +373,8 @@ export interface BackupPayload {
   avatars?: Array<{ sourcePath: string; fileName: string }>
   /** Base64 VRM bytes sent over the local bridge so a PC push also delivers avatars. */
   avatarFiles?: Array<{ fileName: string; dataBase64: string }>
+  /** Ollama GGUF model metadata sent over the local bridge; bytes stream from the PC on demand. */
+  modelFiles?: Array<{ name: string; fileName: string; digest: string; size: number }>
 }
 
 export interface BackupSummary {
@@ -386,6 +388,7 @@ export interface BackupSummary {
   calendarEvents: number
   settings: number
   avatars: number
+  models?: number
 }
 
 export interface BridgeConfig {

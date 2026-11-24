@@ -98,6 +98,10 @@ class VirtuaBridge(
             "listAvatars" -> listAvatars()
             "readVrm" -> readVrm(args)
             "saveAvatar" -> saveAvatar(args)
+            "beginModel" -> beginModel(args)
+            "writeModelChunk" -> writeModelChunk(args)
+            "finishModel" -> finishModel(args)
+            "cancelModel" -> cancelModel(args)
             "scanQr" -> launchOnMain { activity.launchQrScanner(callbackId) }
             "speak" -> speak(args.optString("text"))
             "importBundleFromSaf" -> launchOnMain { activity.launchImportBundle(callbackId) }
@@ -206,6 +210,89 @@ class VirtuaBridge(
             .put("name", destination.name)
             .put("path", destination.absolutePath)
             .put("size", destination.length())
+    }
+
+    private fun modelFile(path: String, suffix: String? = null): File {
+        val file = File(path)
+        val root = modelsDir.canonicalPath + File.separator
+        if (!file.canonicalPath.startsWith(root)) {
+            throw SecurityException("Only app-private model files can be used.")
+        }
+        if (suffix != null && !file.name.endsWith(suffix, ignoreCase = true)) {
+            throw IllegalArgumentException("Invalid model transfer file: $path")
+        }
+        return file
+    }
+
+    /** Prepare an app-private model download; skips a model already present at the same size. */
+    private fun beginModel(args: JSONObject): JSONObject {
+        val fileName = args.optString("fileName").takeIf { it.isNotBlank() }
+            ?: throw IllegalArgumentException("beginModel requires a fileName")
+        val size = args.optLong("size", -1)
+        if (size <= 0) throw IllegalArgumentException("beginModel requires a positive size")
+
+        val dir = modelsDir
+        if (!dir.exists() && !dir.mkdirs()) {
+            throw IllegalStateException("Cannot create ${dir.absolutePath}")
+        }
+        val targetName = safeFileName(fileName, ".gguf")
+        val exact = File(dir, targetName)
+        if (exact.isFile && exact.length() == size) {
+            return JSONObject()
+                .put("name", exact.name)
+                .put("path", exact.absolutePath)
+                .put("size", exact.length())
+                .put("skipped", true)
+        }
+
+        val destination = uniqueFile(dir, targetName)
+        val temp = File(dir, "${destination.name}.part")
+        if (temp.exists() && !temp.delete()) {
+            throw IllegalStateException("Cannot replace stale download: ${temp.absolutePath}")
+        }
+        FileOutputStream(temp).use { }
+        return JSONObject()
+            .put("name", destination.name)
+            .put("path", destination.absolutePath)
+            .put("tempPath", temp.absolutePath)
+            .put("size", size)
+            .put("skipped", false)
+    }
+
+    /** Append one streamed GGUF chunk. The phone holds only one chunk in memory at a time. */
+    private fun writeModelChunk(args: JSONObject): JSONObject {
+        val temp = modelFile(args.optString("tempPath"), ".part")
+        val encoded = args.optString("dataBase64").takeIf { it.isNotBlank() }
+            ?: throw IllegalArgumentException("writeModelChunk requires dataBase64")
+        val bytes = Base64.decode(encoded, Base64.NO_WRAP)
+        FileOutputStream(temp, true).use { it.write(bytes) }
+        return JSONObject().put("written", temp.length())
+    }
+
+    private fun finishModel(args: JSONObject): JSONObject {
+        val temp = modelFile(args.optString("tempPath"), ".part")
+        val target = modelFile(args.optString("targetPath"))
+        val size = args.optLong("size", -1)
+        if (!temp.isFile || size <= 0 || temp.length() != size) {
+            temp.delete()
+            throw IllegalStateException("Model download is incomplete.")
+        }
+        if (target.exists() && !target.delete()) {
+            throw IllegalStateException("Cannot replace model: ${target.absolutePath}")
+        }
+        if (!temp.renameTo(target)) {
+            throw IllegalStateException("Cannot finish model download: ${target.absolutePath}")
+        }
+        return JSONObject()
+            .put("name", target.name)
+            .put("path", target.absolutePath)
+            .put("size", target.length())
+    }
+
+    private fun cancelModel(args: JSONObject): JSONObject {
+        val temp = modelFile(args.optString("tempPath"), ".part")
+        temp.delete()
+        return JSONObject().put("cancelled", true)
     }
 
     fun onVrmPicked(callbackId: String, uri: Uri?) = handleSafResult(callbackId) {

@@ -40,8 +40,9 @@ window.__virtuaNativeCallback(callbackId, { ok: true, value: ... })
 window.__virtuaNativeCallback(callbackId, { ok: false, error: "..." })
 ```
 
-Supported methods: `models`, `pickModel`, `loadModel`, `complete`, `cancel`, `pickVrm`, `speak`,
-`importBundleFromSaf`, `exportBundleToSaf`.
+Supported methods: `models`, `pickModel`, `loadModel`, `complete`, `cancel`, `pickVrm`, `listAvatars`,
+`readVrm`, `saveAvatar`, `beginModel`, `writeModelChunk`, `finishModel`, `cancelModel`, `speak`,
+`importBundleFromSaf`, `exportBundleToSaf`, `scanQr`.
 
 Private storage:
 
