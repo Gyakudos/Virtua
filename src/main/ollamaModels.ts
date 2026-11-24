@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join, relative, resolve, sep } from 'node:path'
+import type { BackupPayload } from '../shared/types'
 
 const DEFAULT_ROOT = join(homedir(), '.ollama', 'models')
 const MODEL_LAYER = 'application/vnd.ollama.image.model'
@@ -106,6 +107,18 @@ function nameFromManifest(manifestRoot: string, manifestPath: string): string | 
   const tag = parts.pop()
   if (!tag || !parts.every(isSegment) || !isSegment(tag)) return null
   return `${parts.join('/')}:${tag}`
+}
+
+/** Diagnostic snapshot of the local Ollama model discovery paths. */
+export function inspectOllamaModels(): NonNullable<BackupPayload['modelDiscovery']> {
+  const root = resolve(modelsRoot())
+  const manifestRoot = resolve(root, 'manifests')
+  const paths: string[] = []
+  walkManifests(manifestRoot, paths)
+  const names = paths
+    .map((path) => nameFromManifest(manifestRoot, path))
+    .filter((name): name is string => Boolean(name))
+  return { root, manifestRoot, manifestCount: paths.length, names }
 }
 
 /**

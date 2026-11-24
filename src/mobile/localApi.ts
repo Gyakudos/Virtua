@@ -117,7 +117,8 @@ export function summarizePayload(payload: BackupPayload): BackupSummary {
     calendarEvents: payload.calendarEvents.length,
     settings: payload.settings.length,
     avatars: payload.avatars?.length ?? 0,
-    models: payload.modelFiles?.length ?? 0
+    models: payload.modelFiles?.length ?? 0,
+    modelDiscovery: payload.modelDiscovery
   }
 }
 

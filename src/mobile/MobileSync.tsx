@@ -60,8 +60,11 @@ export default function MobileSync({ controls, status }: Props) {
       const modelIssue = summary.modelErrors?.length
         ? ` Model issue: ${summary.modelErrors[0]}${summary.modelErrors.length > 1 ? ` (+${summary.modelErrors.length - 1} more)` : ''}`
         : ''
+      const discovery = summary.modelDiscovery
+        ? ` PC discovery: ${summary.modelDiscovery.manifestCount} manifests at ${summary.modelDiscovery.root}${summary.modelDiscovery.names.length ? ` [${summary.modelDiscovery.names.join(', ')}]` : ''}.`
+        : ''
       setMessage(
-        `Imported ${summary.conversations} chats, ${summary.messages} messages, ${summary.avatars ?? 0} avatars, ${summary.models ?? 0} models.${modelIssue}`
+        `Imported ${summary.conversations} chats, ${summary.messages} messages, ${summary.avatars ?? 0} avatars, ${summary.models ?? 0} models.${modelIssue}${discovery}`
       )
     } catch (error) {
       report(error)

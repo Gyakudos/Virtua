@@ -425,8 +425,11 @@ export default function AssistantApp() {
       const modelIssue = summary.modelErrors?.length
         ? ` Model issue: ${summary.modelErrors[0]}${summary.modelErrors.length > 1 ? ` (+${summary.modelErrors.length - 1} more)` : ''}`
         : ''
+      const discovery = summary.modelDiscovery
+        ? ` PC discovery: ${summary.modelDiscovery.manifestCount} manifests at ${summary.modelDiscovery.root}${summary.modelDiscovery.names.length ? ` [${summary.modelDiscovery.names.join(', ')}]` : ''}.`
+        : ''
       setSystemMessage(
-        `Ported to phone: ${summary.conversations} chats, ${summary.messages} messages, ${summary.avatars ?? 0} avatars, ${summary.models ?? 0} models.${modelIssue}`
+        `Ported to phone: ${summary.conversations} chats, ${summary.messages} messages, ${summary.avatars ?? 0} avatars, ${summary.models ?? 0} models.${modelIssue}${discovery}`
       )
     } catch (cause) { systemError(cause) } finally {
       setSyncBusy(false)

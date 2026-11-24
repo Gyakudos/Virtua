@@ -375,6 +375,8 @@ export interface BackupPayload {
   avatarFiles?: Array<{ fileName: string; dataBase64: string }>
   /** Ollama GGUF model metadata sent over the local bridge; bytes stream from the PC on demand. */
   modelFiles?: Array<{ name: string; fileName: string; digest: string; size: number }>
+  /** Diagnostic from the PC about where it looked for installed Ollama models. */
+  modelDiscovery?: { root: string; manifestRoot: string; manifestCount: number; names: string[] }
 }
 
 export interface BackupSummary {
@@ -391,6 +393,7 @@ export interface BackupSummary {
   models?: number
   /** Non-fatal GGUF transfer failures, surfaced in the sync message. */
   modelErrors?: string[]
+  modelDiscovery?: BackupPayload['modelDiscovery']
 }
 
 export interface BridgeConfig {

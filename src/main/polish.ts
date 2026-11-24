@@ -6,7 +6,7 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSyn
 import { basename, dirname, extname, join } from 'node:path'
 import type { BackupPayload, BackupSummary } from '../shared/types'
 import { BUILD_VERSION } from '../shared/version'
-import { listOllamaModelFiles } from './ollamaModels'
+import { inspectOllamaModels, listOllamaModelFiles } from './ollamaModels'
 import { isCredentialPath } from './rag'
 import * as store from './storage'
 
@@ -189,7 +189,8 @@ export async function buildMobilePullPayload(): Promise<BackupPayload> {
     ...payload,
     avatars: assets.avatars,
     avatarFiles: assets.avatarFiles,
-    modelFiles: models.map(({ name, fileName, digest, size }) => ({ name, fileName, digest, size }))
+    modelFiles: models.map(({ name, fileName, digest, size }) => ({ name, fileName, digest, size })),
+    modelDiscovery: inspectOllamaModels()
   }
 }
 
