@@ -396,6 +396,25 @@ export interface BackupSummary {
   modelDiscovery?: BackupPayload['modelDiscovery']
 }
 
+/** Model metadata returned by the PC for the phone's dedicated download action. */
+export interface PcModelInfo {
+  name: string
+  fileName: string
+  digest: string
+  size: number
+}
+
+export interface PcModelCatalog {
+  models: PcModelInfo[]
+  discovery?: BackupPayload['modelDiscovery']
+}
+
+export interface ModelDownloadResult {
+  downloaded: number
+  skipped: number
+  errors: string[]
+}
+
 export interface BridgeConfig {
   enabled: boolean
   bindLan: boolean

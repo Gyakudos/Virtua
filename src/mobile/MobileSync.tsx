@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { TrustedDevice } from '../shared/types'
+import type { PcModelCatalog, PcModelInfo, TrustedDevice } from '../shared/types'
 import { deviceIdentity, type LinkStatus } from './linkedApi'
 import type { MobileControls } from './mobile'
 import { parsePairLink } from './pairing'
@@ -12,6 +12,8 @@ interface Props {
 export default function MobileSync({ controls, status }: Props) {
   const [link, setLink] = useState(controls.linkConfig())
   const [devices, setDevices] = useState<TrustedDevice[]>([])
+  const [pcModels, setPcModels] = useState<PcModelCatalog | null>(null)
+  const [selectedModel, setSelectedModel] = useState('')
   const [message, setMessage] = useState('')
   const [syncBusy, setSyncBusy] = useState(false)
 
@@ -69,6 +71,58 @@ export default function MobileSync({ controls, status }: Props) {
     } catch (error) {
       report(error)
     }
+  }
+
+  const describePcModels = (catalog: PcModelCatalog): string => {
+    if (catalog.models.length === 0) {
+      const info = catalog.discovery
+        ? ` PC discovery: ${catalog.discovery.manifestCount} manifests at ${catalog.discovery.root}${catalog.discovery.names.length ? ` [${catalog.discovery.names.join(', ')}]` : ''}.`
+        : ''
+      return `No models found on the PC.${info}`
+    }
+    return `Found ${catalog.models.length} PC model(s).`
+  }
+
+  const listPcModels = async (): Promise<void> => {
+    if (!connected) {
+      setMessage('Connect to the desktop bridge first.')
+      return
+    }
+    setSyncBusy(true)
+    try {
+      const catalog = await controls.listPcModels()
+      setPcModels(catalog)
+      setSelectedModel((current) => current && catalog.models.some((model) => model.name === current)
+        ? current
+        : catalog.models[0]?.name ?? '')
+      setMessage(describePcModels(catalog))
+    } catch (error) {
+      report(error)
+    } finally {
+      setSyncBusy(false)
+    }
+  }
+
+  const downloadPcModel = async (): Promise<void> => {
+    if (!selectedModel) {
+      setMessage('List PC models first, then choose one to download.')
+      return
+    }
+    setSyncBusy(true)
+    try {
+      const result = await controls.downloadPcModel(selectedModel)
+      const errorText = result.errors.length ? ` ${result.errors[0]}` : ''
+      setMessage(`Model download: ${result.downloaded} downloaded, ${result.skipped} already present.${errorText}`)
+    } catch (error) {
+      report(error)
+    } finally {
+      setSyncBusy(false)
+    }
+  }
+
+  const modelSize = (model: PcModelInfo): string => {
+    const gib = model.size / (1024 ** 3)
+    return gib >= 1 ? `${gib.toFixed(1)} GiB` : `${Math.max(1, Math.round(model.size / (1024 ** 2)))} MiB`
   }
 
   const syncPush = async (): Promise<void> => {
@@ -159,6 +213,33 @@ export default function MobileSync({ controls, status }: Props) {
             </button>
           </div>
         </details>
+      </section>
+
+      <section className="sync-card">
+        <h3>Download Model From PC</h3>
+        <p className="sync-hint">Fetch a GGUF model directly without importing the rest of the PC snapshot.</p>
+        <div className="sync-actions">
+          <button type="button" className="sync-button" disabled={!connected || syncBusy} onClick={() => void listPcModels()}>
+            List models on PC
+          </button>
+          <button type="button" className="sync-button" disabled={!connected || syncBusy || !selectedModel} onClick={() => void downloadPcModel()}>
+            Download Model From PC
+          </button>
+        </div>
+        {pcModels && pcModels.models.length > 0 ? (
+          <label className="model-select">
+            Model
+            <select value={selectedModel} onChange={(event) => setSelectedModel(event.target.value)}>
+              {pcModels.models.map((model) => (
+                <option key={model.name} value={model.name}>
+                  {model.name} · {modelSize(model)}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : (
+          <p className="sync-hint">No PC models listed yet. Tap <strong>List models on PC</strong>.</p>
+        )}
       </section>
 
       <section className="sync-card">

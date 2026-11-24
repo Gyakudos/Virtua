@@ -1,4 +1,10 @@
-import type { BackupPayload, BackupSummary, TrustedDevice } from '../shared/types'
+import type {
+  BackupPayload,
+  BackupSummary,
+  ModelDownloadResult,
+  PcModelCatalog,
+  TrustedDevice
+} from '../shared/types'
 import type { LinkConfig, LinkStatus } from './linkedApi'
 import type { NativeAvatar, NativeModel } from './localApi'
 
@@ -25,6 +31,8 @@ export interface MobileControls {
   importPayload(payload: BackupPayload): Promise<BackupSummary>
   pull(): Promise<BackupSummary>
   push(): Promise<void>
+  listPcModels(): Promise<PcModelCatalog>
+  downloadPcModel(name: string): Promise<ModelDownloadResult>
 }
 
 declare global {

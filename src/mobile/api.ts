@@ -1,6 +1,13 @@
-import type { AvatarConfig, BackupPayload, BackupSummary, VrmFileInfo } from '../shared/types'
+import type {
+  AvatarConfig,
+  BackupPayload,
+  BackupSummary,
+  ModelDownloadResult,
+  PcModelCatalog,
+  VrmFileInfo
+} from '../shared/types'
 import { createLinkedApi, readLinkConfig, type LinkConfig, type LinkStatus } from './linkedApi'
-import { createLocalApi, importPayloadWithAvatars } from './localApi'
+import { createLocalApi, downloadPcModels, importPayloadWithAvatars } from './localApi'
 import * as store from './localStore'
 import type { MobileControls, MobileMode } from './mobile'
 import { bytesToBase64, consumePairIntent, scanQrCode } from './native'
@@ -108,6 +115,18 @@ export function installMobileApi(): { mode: MobileMode; controls: MobileControls
     push: async () => {
       const payload = store.exportBundle()
       await linked.api.sync.push(payload)
+    },
+    listPcModels: async () => {
+      const payload = await linked.api.sync.pull() as BackupPayload
+      return { models: payload.modelFiles ?? [], discovery: payload.modelDiscovery }
+    },
+    downloadPcModel: async (name) => {
+      const payload = await linked.api.sync.pull() as BackupPayload
+      const files = (payload.modelFiles ?? []).filter((file) => file.name === name)
+      if (files.length === 0) {
+        return { downloaded: 0, skipped: 0, errors: [`Model ${name} is no longer available on the PC.`] }
+      }
+      return await downloadPcModels(files)
     }
   }
 

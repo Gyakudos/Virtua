@@ -186,6 +186,7 @@ interface ModelTransferBegin {
 
 interface ModelImportResult {
   imported: ImportedModel[]
+  skipped: number
   errors: string[]
 }
 
@@ -196,11 +197,11 @@ function errorMessage(error: unknown): string {
 }
 
 /** Stream Ollama GGUF files from the PC bridge into app-private phone storage. */
-async function importModelFiles(payload: BackupPayload): Promise<ModelImportResult> {
+async function importModelFiles(files: NonNullable<BackupPayload['modelFiles']>): Promise<ModelImportResult> {
   const imported: ImportedModel[] = []
   const errors: string[] = []
-  const files = payload.modelFiles ?? []
-  if (files.length === 0) return { imported, errors }
+  let skipped = 0
+  if (files.length === 0) return { imported, skipped, errors }
 
   const link = readLinkConfig()
   if (!nativeAvailable() || !link.url || !link.token) {
@@ -208,7 +209,7 @@ async function importModelFiles(payload: BackupPayload): Promise<ModelImportResu
       ? 'Android native bridge is unavailable'
       : 'No active desktop link is configured'
     errors.push(`${reason}; cannot import ${files.length} model(s)`)
-    return { imported, errors }
+    return { imported, skipped, errors }
   }
 
   const origin = link.url.trim().replace(/\/+$/, '')
@@ -233,6 +234,7 @@ async function importModelFiles(payload: BackupPayload): Promise<ModelImportResu
         size
       })
       if (begin.skipped) {
+        skipped += 1
         imported.push({ name: file.name, fileName: begin.name, path: begin.path, size: begin.size })
         continue
       }
@@ -274,7 +276,17 @@ async function importModelFiles(payload: BackupPayload): Promise<ModelImportResu
       console.warn(`[mobile] could not import model ${file.name}:`, error)
     }
   }
-  return { imported, errors }
+  return { imported, skipped, errors }
+}
+
+/** Dedicated phone action: download one or more PC models without importing the rest of the snapshot. */
+export async function downloadPcModels(files: NonNullable<BackupPayload['modelFiles']>): Promise<import('../shared/types').ModelDownloadResult> {
+  const result = await importModelFiles(files)
+  return {
+    downloaded: result.imported.length - result.skipped,
+    skipped: result.skipped,
+    errors: result.errors
+  }
 }
 
 /** Import a snapshot that may contain avatar bytes (local bridge pull or phone port.receive). */
@@ -284,7 +296,7 @@ export async function importPayloadWithAvatars(payload: BackupPayload): Promise<
   }
   const [importedAvatars, modelResult] = await Promise.all([
     importAvatarFiles(payload),
-    importModelFiles(payload)
+    importModelFiles(payload.modelFiles ?? [])
   ])
   const next = remapAvatars(payload, importedAvatars)
   store.importBundle(next)
