@@ -79,29 +79,19 @@ export function installMobileApi(): { mode: MobileMode; controls: MobileControls
         modeSwitching = false
       }
     },
-    linkStatus: () => mode === 'linked' ? linked.controller.status() : 'unconfigured',
-    linkError: () => mode === 'linked' ? linked.controller.error() : '',
-    onLinkStatus: (listener) => mode === 'linked'
-      ? linked.controller.onStatus(listener)
-      : () => undefined,
+    // The paired bridge is available in both modes: Phone mode only changes where chat runs.
+    // Keeping these controls on the linked API lets Portable Sync work without leaving Phone mode.
+    linkStatus: () => linked.controller.status(),
+    linkError: () => linked.controller.error(),
+    onLinkStatus: (listener) => linked.controller.onStatus(listener),
     linkConfig: () => mode === 'linked' ? linked.controller.config() : readLinkConfig(),
-    trustedDevices: () => window.api.bridge.devices(),
-    revokeDevice: async (id) => { await window.api.bridge.revokeDevice(id) },
-    allowDevice: async (id) => { await window.api.bridge.allowDevice(id) },
+    trustedDevices: () => linked.api.bridge.devices(),
+    revokeDevice: async (id) => { await linked.api.bridge.revokeDevice(id) },
+    allowDevice: async (id) => { await linked.api.bridge.allowDevice(id) },
     scanQr: () => scanQrCode(),
-    reconnectLink: () => {
-      if (mode === 'linked') linked.controller.reconnect()
-    },
+    reconnectLink: () => linked.controller.reconnect(),
     setLink: (config: LinkConfig) => {
-      if (mode === 'linked') {
-        linked.controller.setConfig(config)
-        return
-      }
-      localStorage.setItem('virtua.link.url', config.url.trim())
-      localStorage.setItem('virtua.link.token', config.token.trim())
-      const url = new URL(location.href)
-      url.searchParams.set('mode', 'linked')
-      location.href = url.toString()
+      linked.controller.setConfig(config)
     },
     models: () => local.controller.models(),
     pickModel: () => local.controller.pickModel(),
@@ -110,12 +100,14 @@ export function installMobileApi(): { mode: MobileMode; controls: MobileControls
     exportBundle: () => local.controller.exportBundle(),
     importPayload,
     pull: async () => {
-      const payload = await window.api.sync.pull() as BackupPayload
+      // Always pull from the paired PC bridge, even while in Phone mode. The local API's
+      // sync.pull is a SAF bundle import, not a desktop transfer.
+      const payload = await linked.api.sync.pull() as BackupPayload
       return importPayload(payload)
     },
     push: async () => {
       const payload = store.exportBundle()
-      await window.api.sync.push(payload)
+      await linked.api.sync.push(payload)
     }
   }
 
